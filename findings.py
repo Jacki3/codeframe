@@ -30,6 +30,7 @@ import argparse, collections, csv, json, os, re, statistics, sys
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except (AttributeError, ValueError):
     pass
 

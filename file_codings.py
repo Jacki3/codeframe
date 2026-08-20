@@ -39,6 +39,7 @@ import argparse, csv, difflib, io, os, re, sys, unicodedata, json
 # way to the screen even though the files are fine.
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except (AttributeError, ValueError):
     pass
 

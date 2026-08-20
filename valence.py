@@ -40,6 +40,7 @@ import argparse, collections, csv, json, os, sys
 # way to the screen even though the files are fine.
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except (AttributeError, ValueError):
     pass
 

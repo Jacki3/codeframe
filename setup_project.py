@@ -36,6 +36,7 @@ import argparse, collections, csv, json, os, re, statistics, sys
 # way to the screen even though the files are fine.
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except (AttributeError, ValueError):
     pass
 
@@ -541,7 +542,10 @@ def apply(dst):
     meta = {"categories": ([f"has_{kind}"] if n_tr else [])
                           + [fname(h) for h in r.get("categories", [])],
             "measures": [fname(h) for h in r.get("measures", [])]}
-    meta["facets"] = meta["categories"]
+    # Facets default to the categories, but a derived column goes last: has_<kind>
+    # is bookkeeping this tool invented about its own coverage, not something the
+    # study set out to compare, and it should not be the first split on the page.
+    meta["facets"] = sorted(meta["categories"], key=lambda c: c.startswith("has_"))
     # What this study calls its unit, and what kinds of source it holds. Without
     # these every tool downstream has to guess, and a tool that guesses says
     # "game-play" to someone studying museum visits. The label was already
