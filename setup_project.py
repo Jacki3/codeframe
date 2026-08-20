@@ -39,6 +39,8 @@ try:
 except (AttributeError, ValueError):
     pass
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+
 TEXTUAL = 40          # mean characters above which a column is prose, not a label
 MAX_CATEGORY = 12     # distinct values above which a column stops being a category
 
@@ -250,7 +252,7 @@ def link_transcripts(transcripts, roster, raw):
 TIMECODE = re.compile(r"\d\d:\d\d:\d\d[.,]\d+\s*-->|^\[\d+:\d\d\]", re.M)
 
 
-def find_transcripts(root, dst=None):
+def find_transcripts(root, dst=None, skip=()):
     """Transcript files, and whoever appears to be speaking in them.
 
     A .txt only counts if it actually contains timecodes or speaker markers -
@@ -261,7 +263,9 @@ def find_transcripts(root, dst=None):
     for dirpath, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs
                    if not d.startswith(".")
-                   and d not in ("analysis", "coder", "__pycache__")
+                   and d != "__pycache__"
+                   and os.path.abspath(os.path.join(dirpath, d)) != HERE
+                   and d not in skip
                    and (dst is None or os.path.abspath(os.path.join(dirpath, d))
                         != os.path.abspath(dst))
                    and not os.path.exists(os.path.join(dirpath, d, "sources.csv"))]
@@ -332,14 +336,16 @@ def read_vtt(path, pid, roster_blob):
 
 # ---------------------------------------------------------------- phases
 
-def inspect(raw, dst):
+def inspect(raw, dst, skip=()):
     print(f"scanning {raw}\n")
     tables = []
     for dirpath, dirs, files in os.walk(raw):
         # skip our own output and anything that is already a project
         dirs[:] = [d for d in dirs
                    if not d.startswith(".")
-                   and d not in ("analysis", "coder", "__pycache__")
+                   and d != "__pycache__"
+                   and os.path.abspath(os.path.join(dirpath, d)) != HERE
+                   and d not in skip
                    and os.path.abspath(os.path.join(dirpath, d)) != os.path.abspath(dst)
                    and not os.path.exists(os.path.join(dirpath, d, "sources.csv"))]
         for fn in sorted(files):
@@ -357,7 +363,7 @@ def inspect(raw, dst):
                 print(f"  {os.path.relpath(path, raw)} [{sheet}]  "
                       f"{len(rows)} rows x {len(headers)} columns")
 
-    transcripts = find_transcripts(raw, dst)
+    transcripts = find_transcripts(raw, dst, skip)
     if transcripts:
         print(f"  {len(transcripts)} transcript file(s)")
 
@@ -573,6 +579,8 @@ def main():
     ap = argparse.ArgumentParser(description="Inspect raw data and set up a project.")
     ap.add_argument("--raw", help="folder holding the raw data (inspect phase)")
     ap.add_argument("--to", required=True, help="project directory to create")
+    ap.add_argument("--skip", default="", metavar="DIRS",
+                    help="comma-separated folder names to leave out of the scan")
     ap.add_argument("--review", action="store_true",
                     help="ask Claude to check the proposed mapping")
     ap.add_argument("--dry-run", action="store_true",
@@ -586,7 +594,7 @@ def main():
     elif a.apply:
         apply(a.to)
     elif a.raw:
-        inspect(a.raw, a.to)
+        inspect(a.raw, a.to, tuple(x.strip() for x in a.skip.split(',') if x.strip()))
     else:
         ap.error("give --raw to inspect, --review to check it, or --apply to build")
 
