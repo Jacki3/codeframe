@@ -212,7 +212,7 @@ keep the proposed role and say so in "concerns" - a flagged uncertainty is usefu
 and a confident wrong answer is not."""
 
 
-def ask(payload, model="sonnet", timeout=600, task=None):
+def ask(payload, model=None, timeout=600, task=None):
     exe = shutil.which("claude")
     if not exe:
         raise SystemExit(
@@ -306,7 +306,7 @@ def merge(spec, reply, model):
 
 # ---------------------------------------------------------------- driver
 
-def review(dst, model="sonnet", dry_run=False):
+def review(dst, model=None, dry_run=False):
     path = os.path.join(dst, "setup.json")
     if not os.path.exists(path):
         raise SystemExit(f"no setup.json in {dst} - run the inspect phase first")
@@ -314,6 +314,8 @@ def review(dst, model="sonnet", dry_run=False):
     if not spec.get("responses"):
         raise SystemExit("setup.json has no responses table to review")
 
+    from model import current
+    model = model or current()
     payload = digest(spec)
     withheld = sum(1 for c in payload["columns"] if not isinstance(c["values"], list))
     masked = sum(1 for c in payload["columns"] if c.get("values_are"))

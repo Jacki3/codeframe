@@ -180,6 +180,44 @@ source_id, pid, unit, kind, label, text
 plus a `frame.csv` keyed on `pid, unit`. Only `source_id`, `pid`, `unit` and
 `text` are required.
 
+## Choosing the model
+
+```
+python model.py                 # what is set, and what else is available
+python model.py opus --check    # set it, and prove the CLI accepts it
+python model.py --clear         # back to the default
+```
+
+The choice is written to `config.json` beside the scripts and read by every step
+that can call a model. Any of them still takes `--model` to override it for a
+single run.
+
+| alias | id | context | in / out per Mtok | |
+|---|---|---|---|---|
+| `fable` | `claude-fable-5` | 1M | $10 / $50 | most capable; for the hardest reasoning |
+| `opus` | `claude-opus-5` | 1M | $5 / $25 | strong general reasoning |
+| `sonnet` | `claude-sonnet-5` | 1M | $3 / $15 | the default here |
+| `haiku` | `claude-haiku-4-5` | 200K | $1 / $5 | cheapest; for large repeated passes |
+
+*Model list and prices cached 2026-06-24. Prices are first-party API rates, here
+for relative scale — requests go through the Claude Code CLI, which bills against
+whatever plan you are signed in with, so there is no API key to set.*
+
+An alias resolves to the current model of that family, so `opus` keeps working
+after a new Opus is released. A pinned id keeps a study reproducible. For work you
+intend to write up, pin the id.
+
+**Which to pick.** Nothing here asks a model to do arithmetic or to write a
+finding — it proposes a column mapping, a chart spec, a valence, a summary
+paragraph — so the cheaper models are not obviously worse at these jobs. Sonnet is
+the default because it has been enough for all four. Reach for Opus when a mapping
+is genuinely ambiguous or a corpus is unusual; reach for Haiku when you are
+re-running a valence pass over hundreds of excerpts and cost is the constraint.
+
+`--check` sends one trivial request and reports which model actually answered. A
+model name is not validated until something is sent, and the worst moment to
+discover a typo is part-way through a long pass.
+
 ## Where a model is involved
 
 Three places, all optional, none of them load-bearing:

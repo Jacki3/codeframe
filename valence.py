@@ -185,7 +185,8 @@ def settle(code_v, model_v):
 def main():
     ap = argparse.ArgumentParser(description="Propose a valence for unjudged codings.")
     ap.add_argument("--data", required=True, help="project directory")
-    ap.add_argument("--model", default="sonnet")
+    ap.add_argument("--model", default=None,
+                    help="override the model set by model.py, for this run")
     ap.add_argument("--batch", type=int, default=25, help="excerpts per request")
     ap.add_argument("--offline", action="store_true",
                     help="use codes.csv only; send nothing anywhere")
@@ -194,6 +195,8 @@ def main():
     ap.add_argument("--apply", action="store_true", help="write; otherwise report only")
     a = ap.parse_args()
 
+    from model import current
+    a.model = a.model or current()
     root = os.path.abspath(a.data)
     codings, excerpts, codes = load(root)
     todo = targets(codings, excerpts, codes)

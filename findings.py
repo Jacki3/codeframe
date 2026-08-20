@@ -770,8 +770,11 @@ def main():
     ap.add_argument("--summarise", action="store_true",
                     help="with --discussion: add a generated paragraph per lens")
     ap.add_argument("--add", metavar="REQUEST", help="add one finding from a request")
-    ap.add_argument("--model", default="sonnet")
+    ap.add_argument("--model", default=None,
+                    help="override the model set by model.py, for this run")
     a = ap.parse_args()
+    from model import current
+    a.model = a.model or current()
     if a.add:
         cmd_add(a.data, a.add, a.model)
     elif a.discussion:
