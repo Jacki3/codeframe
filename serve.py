@@ -213,7 +213,7 @@ fetch('api/data').then(r=>r.json()).then(boot);
 function boot(d){
   D=d; CODES={}; d.codes.forEach(c=>CODES[c.id]=c);
   $('meta').innerHTML=`${d.meta.sources} sources · ${d.meta.participants} participants · `
-    +`${d.meta.plays} game-plays<br>${d.meta.excerpts} excerpts · coder “${esc(d.meta.coder)}”<br>${esc(d.meta.root)}`;
+    +`${d.meta.plays} ${esc(d.meta.units||'units')}<br>${d.meta.excerpts} excerpts · coder “${esc(d.meta.coder)}”<br>${esc(d.meta.root)}`;
   // Interviews cover a whole session and carry no unit, so filter the blanks out
   // rather than offering an empty option that reads as a missing game.
   const unit=d.meta.unit||'unit', units=d.meta.units||(unit+'s');
@@ -516,7 +516,7 @@ def main():
     say = lambda t: print(t, flush=True)   # visible even when redirected
     say(f"project : {m['root']}")
     say(f"sources : {m['sources']} documents, {m['participants']} participants, "
-          f"{m['plays']} game-plays")
+          f"{m['plays']} {m['units']}")
     say(f"codebook: {len(proj.codes)} codes · excerpts: {m['excerpts']}")
     say(f"coder   : {a.coder}{'  (READ-ONLY)' if a.read_only else ''}")
     # Bind BEFORE opening a browser. Opening first means a failed bind still

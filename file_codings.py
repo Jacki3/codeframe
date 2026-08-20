@@ -271,7 +271,7 @@ def main():
     plays = set(frame) or {(s["pid"], s["game"]) for s in sources}
     covered = {(x["pid"], x["game"]) for x in excerpts.values()} & plays
     # An interview covers a whole session, so it carries no single unit and its
-    # excerpts belong to no one game-play. They are still evidence about that
+    # excerpts belong to no one unit of the study. They are still evidence about
     # participant, so they are counted separately rather than quietly dropped.
     loose = {x["pid"] for x in excerpts.values() if (x["pid"], x["game"]) not in plays}
     print(f"sheet    : {len(rows)} rows from {os.path.basename(a.sheet)}")
