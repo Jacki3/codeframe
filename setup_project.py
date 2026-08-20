@@ -425,7 +425,64 @@ def inspect(raw, dst, skip=()):
     print("The machine finds candidates; only you know which column you meant.")
 
 
-def apply(dst):
+def check_renames(dst, prev, lab, r, allow_rename):
+    """Refuse to rename a frame column that something already refers to.
+
+    Labels are proposed, not derived, so two runs of --review over the same data
+    can legitimately land on "device" and "phone_os" for the same column. Either
+    is a fine name; changing it under a project that has already been built is
+    not, because a facets list and a saved finding refer to columns by name and a
+    renamed column does not error - it silently matches nothing.
+    """
+    was = prev.get("columns") or {}
+    if not was:
+        return
+    by_header = {header: label for label, header in was.items()}
+    renames = []
+    for h in r.get("categories", []) + r.get("measures", []):
+        new = lab.get(h, h)
+        old = by_header.get(h)
+        if old and old != new:
+            renames.append((old, new, h))
+    if not renames:
+        return
+
+    refs = {}
+    for old, _, _ in renames:
+        where = []
+        if old in (prev.get("facets") or []):
+            where.append("frame.json facets")
+        p_specs = os.path.join(dst, "findings", "specs.json")
+        if os.path.exists(p_specs):
+            for spec in json.load(open(p_specs, encoding="utf-8")):
+                if spec.get("by") == old or old in (spec.get("measures") or []):
+                    where.append(f"findings/specs.json {spec.get('id')}")
+        refs[old] = where
+
+    if allow_rename:
+        print(f"  renaming {len(renames)} existing frame column(s):")
+        for old, new, _ in renames:
+            print(f"    {old} -> {new}"
+                  + (f"   (referred to by {', '.join(refs[old])})" if refs[old] else ""))
+        return
+
+    lines = [f"refusing to rename {len(renames)} frame column(s) that already exist:"]
+    for old, new, header in renames:
+        lines.append(f"  {old} -> {new}")
+        lines.append(f"      column: {header[:70]}")
+        lines.append("      referred to by: "
+                     + (", ".join(refs[old]) if refs[old] else "nothing yet"))
+    lines += [
+        "",
+        "A rename does not error downstream, it goes quiet: a facets entry or a",
+        "saved finding naming the old column simply stops matching.",
+        "",
+        'Either put the old name back in "labels" in setup.json, or re-run with',
+        "--allow-rename and update the references yourself."]
+    raise SystemExit(chr(10).join(lines))
+
+
+def apply(dst, allow_rename=False):
     spec_path = os.path.join(dst, "setup.json")
     if not os.path.exists(spec_path):
         raise SystemExit(f"no setup.json in {dst} - run the inspect phase first")
@@ -519,6 +576,12 @@ def apply(dst):
         for fr in frame.values():
             fr.setdefault("has_" + kind, "no")
 
+    prev = {}
+    p_prev = os.path.join(dst, "frame.json")
+    if os.path.exists(p_prev):
+        prev = json.load(open(p_prev, encoding="utf-8"))
+    check_renames(dst, prev, lab, r, allow_rename)
+
     def write(p, fields, rowset):
         with open(p, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
@@ -542,10 +605,19 @@ def apply(dst):
     meta = {"categories": ([f"has_{kind}"] if n_tr else [])
                           + [fname(h) for h in r.get("categories", [])],
             "measures": [fname(h) for h in r.get("measures", [])]}
+    # label -> the header it came from, so a later run can tell a RENAME from a
+    # column appearing or disappearing. Without this, re-running --review after
+    # editing labels silently renames frame columns and anything that named the
+    # old one - a facets list, a saved finding - stops matching and goes quiet.
+    meta["columns"] = {fname(h): h for h in
+                       r.get("categories", []) + r.get("measures", [])}
     # Facets default to the categories, but a derived column goes last: has_<kind>
     # is bookkeeping this tool invented about its own coverage, not something the
     # study set out to compare, and it should not be the first split on the page.
-    meta["facets"] = sorted(meta["categories"], key=lambda c: c.startswith("has_"))
+    # A facets list the researcher has trimmed is a decision, not a derived value.
+    kept = [c for c in (prev.get("facets") or []) if c in meta["categories"]]
+    meta["facets"] = kept or sorted(meta["categories"],
+                                    key=lambda c: c.startswith("has_"))
     # What this study calls its unit, and what kinds of source it holds. Without
     # these every tool downstream has to guess, and a tool that guesses says
     # "game-play" to someone studying museum visits. The label was already
@@ -591,12 +663,14 @@ def main():
                     help="with --review: print what would be sent and send nothing")
     ap.add_argument("--model", default="sonnet", help="model for --review")
     ap.add_argument("--apply", action="store_true", help="build from a corrected setup.json")
+    ap.add_argument("--allow-rename", action="store_true",
+                    help="permit renaming a frame column that already exists")
     a = ap.parse_args()
     if a.review:
         import review
         review.review(a.to, model=a.model, dry_run=a.dry_run)
     elif a.apply:
-        apply(a.to)
+        apply(a.to, a.allow_rename)
     elif a.raw:
         inspect(a.raw, a.to, tuple(x.strip() for x in a.skip.split(',') if x.strip()))
     else:

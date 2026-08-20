@@ -35,7 +35,8 @@ except (AttributeError, ValueError):
     pass
 
 csv.field_size_limit(10 ** 8)
-KINDS = ("prevalence", "valence", "split", "measures", "dependence")
+KINDS = ("prevalence", "valence", "split", "measures", "dependence",
+         "cooccur")
 VALENCE_ORDER = ("pos", "mixed", "neutral", "neg", "")
 # colours for source kinds, assigned by position - a project may have any
 KIND_CLASS = ("pos", "mixed", "neutral", "neg")
@@ -240,8 +241,45 @@ def f_dependence(D, spec):
                     "people."}
 
 
+def f_cooccur(D, spec):
+    """Which codes travel together.
+
+    Two levels, and they say different things. At excerpt level the same passage
+    carries both codes, which is a claim about one thing somebody said. At unit
+    level the same person said both about the same unit, which is a claim about
+    an experience rather than a sentence. Unit is the default because it shares
+    its denominator with every other figure here.
+    """
+    level = spec.get("level") if spec.get("level") in ("unit", "excerpt") else "unit"
+    codes = ranked(D)[:spec.get("top", 12)]
+    sets = ({c: {x["excerpt_id"] for _, x in D["by_code"][c]} for c in codes}
+            if level == "excerpt" else {c: set(D["plays"][c]) for c in codes})
+
+    matrix = [[len(sets[a]) if a == b else len(sets[a] & sets[b]) for b in codes]
+              for a in codes]
+    pairs = []
+    for i, a in enumerate(codes):
+        for b in codes[i + 1:]:
+            both, union = len(sets[a] & sets[b]), len(sets[a] | sets[b])
+            if both:
+                pairs.append({"a": a, "b": b, "both": both,
+                              "jaccard": round(both / union, 2) if union else 0.0})
+    pairs.sort(key=lambda p: (-p["both"], -p["jaccard"]))
+    where = "the same excerpt" if level == "excerpt" else f"the same {D['unit']}"
+    return {"codes": codes, "matrix": matrix, "pairs": pairs[:10], "level": level,
+            "empty": f"No two of these codes share {where} yet.",
+            "note": f"How many times two codes land on {where}. The diagonal is each "
+                    "code's own total, so a row reads as: of the N this code appears "
+                    "on, how many also carry each other code. Jaccard in the list "
+                    "below is the overlap as a share of everything either code "
+                    "touches, which stops a common code looking related to all of "
+                    "them. Co-occurrence is not influence: two codes can share a "
+                    f"{D['unit']} because the same person is talkative."}
+
+
 COMPUTE = {"prevalence": f_prevalence, "valence": f_valence, "split": f_split,
-           "measures": f_measures, "dependence": f_dependence}
+           "measures": f_measures, "dependence": f_dependence,
+           "cooccur": f_cooccur}
 
 
 # ----------------------------------------------------------------- defaults
@@ -258,6 +296,8 @@ def default_specs(D):
     if measures(D):
         specs.append({"id": "measures", "kind": "measures", "top": 12, "show": 14,
                       "title": "What goes with higher and lower scores"})
+    specs.append({"id": "cooccur", "kind": "cooccur", "top": 12, "level": "unit",
+                  "title": "Which codes travel together"})
     specs.append({"id": "dependence", "kind": "dependence", "top": 15,
                   "title": "Where each code's evidence came from"})
     return specs
@@ -397,6 +437,32 @@ def draw(D, spec, res):
                          f'<td class="r num" style="color:{col}">{r["diff"]:+}</td>'
                          f'<td class="r num">{r["n"]}</td></tr>')
             H.append('</table></div>')
+
+    elif k == "cooccur":
+        cs = res["codes"]
+        hi = max([n for i, row in enumerate(res["matrix"])
+                  for j, n in enumerate(row) if i != j] or [1])
+        H.append('<div class="scroll"><table><tr><th>code</th>'
+                 + "".join(f'<th class="r">{i+1}</th>' for i in range(len(cs)))
+                 + '</tr>')
+        for i, (cid, row) in enumerate(zip(cs, res["matrix"])):
+            cells = "".join(
+                f'<td class="cell" style="{"color:var(--ink-3)" if i == j else heat(n, hi)}"'
+                f' title="{esc(cid)} + {esc(cs[j])}: {n}">{n or ""}</td>'
+                for j, n in enumerate(row))
+            H.append(f'<tr><td class="code">{i+1}. {esc(cid)}</td>{cells}</tr>')
+        H.append('</table></div>')
+        if res["pairs"]:
+            H.append('<p class="key" style="margin-top:14px">strongest pairs</p>'
+                     '<div class="scroll"><table><tr><th>pair</th>'
+                     '<th class="r">together</th><th class="r">jaccard</th></tr>')
+            for p in res["pairs"]:
+                H.append(f'<tr><td class="code">{esc(p["a"])} + {esc(p["b"])}</td>'
+                         f'<td class="r num">{p["both"]}</td>'
+                         f'<td class="r num">{p["jaccard"]}</td></tr>')
+            H.append('</table></div>')
+        else:
+            H.append(f'<p class="empty">{esc(res["empty"])}</p>')
 
     elif k == "dependence":
         for r in res["rows"]:
@@ -627,6 +693,10 @@ Choose one kind:
   measures    where a code coincides with higher or lower scores on the numeric
               measures. Optionally set "measures" to a subset of their names.
   dependence  which source kind each code's evidence came from.
+  cooccur     which codes land together. Set "level" to "excerpt" for codes on
+              the same passage, or "unit" (the default) for codes on the same
+              unit of the study. This is the one for "which codes appear
+              together", "what goes with X", and overlap questions.
 
 Reply with JSON only:
 
@@ -634,6 +704,7 @@ Reply with JSON only:
  "by": "<category column, only for split>",
  "top": <how many codes, default 15>,
  "measures": ["<measure name>"],
+ "level": "<unit or excerpt, only for cooccur>",
  "title": "<a short, plain title for the figure, sentence case, no numbers>",
  "why": "<one sentence on why this kind answers the request>"}
 
@@ -669,6 +740,8 @@ def cmd_add(root, request, model):
         if by not in cats:
             raise SystemExit(f"cannot split by {by!r} - available: {', '.join(cats)}")
         spec["by"] = by
+    if kind == "cooccur" and reply.get("level") in ("unit", "excerpt"):
+        spec["level"] = reply["level"]
     if kind == "measures" and reply.get("measures"):
         keep = [m for m in reply["measures"] if m in measures(D)]
         if keep:

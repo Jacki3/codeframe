@@ -120,8 +120,9 @@ rebuilds from the corpus and two people with the same corpus get the same page.
 Custom findings survive a regenerate.
 
 Built-in kinds: `prevalence`, `valence`, `split` (code by category), `measures`
-(where a code coincides with higher or lower scores), `dependence` (which kind of
-source the evidence came from).
+(where a code coincides with higher or lower scores), `cooccur` (which codes land
+together, at `unit` or `excerpt` level), `dependence` (which kind of source the
+evidence came from).
 
 `--add` turns a request in words into a spec. It never returns a number and never
 sees a quote.
@@ -148,6 +149,24 @@ nouns from there, so a study of museum visits says "36 visits" and offers a Kind
 filter of `diary` and `focus_group`. `facets` is the shortlist of categories the
 coding rail and the default findings splits use — drop a name from it to remove a
 dropdown without touching the data.
+
+## Rebuilding a project that already exists
+
+`--apply` can be re-run at any time; everything derived regenerates from
+`setup.json`. Two things are protected because they are decisions rather than
+derived values:
+
+**A trimmed `facets` list survives a rebuild.** If you have removed a category
+from the coding rail, it stays removed.
+
+**Renaming an existing frame column is refused.** Labels are proposed, not
+derived, so two runs of `--review` over the same data can land on `device` and
+`phone_os` for the same column. Either is a fine name; changing it under a project
+that has already been built is not, because a `facets` entry or a saved finding
+refers to columns by name, and a renamed column does not error — it silently stops
+matching. `frame.json` records which header each label came from, so a rename is
+told apart from a column appearing or disappearing, and the refusal names
+everything that referred to the old name. Pass `--allow-rename` when you mean it.
 
 ## Bringing your own data
 
