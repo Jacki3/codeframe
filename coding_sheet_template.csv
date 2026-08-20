@@ -1,0 +1,5 @@
+quote,code,valence,note,pid,unit
+"Paste the passage here, exactly as you copied it.",THEME-EXAMPLE,pos,Optional. Anything you want kept with this coding.,,
+A passage carrying two ideas takes two codes.,THEME-EXAMPLE;THEME-OTHER,mixed,Separate codes with a semicolon.,,
+Leave valence blank if you have not judged it - blank stays blank.,THEME-OTHER,,valence.py can settle these later.,,
+Only fill pid and unit if the report says a quote is ambiguous.,THEME-EXAMPLE,neutral,,38,Condition B
