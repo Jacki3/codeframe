@@ -368,7 +368,10 @@ figcaption{color:var(--ink-3);font-size:12.5px;margin-top:22px;line-height:1.65;
 .lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);
  font-size:11.5px;color:var(--ink-2)}
 .bar-track{display:block;background:var(--surface-2);border-radius:var(--radius-sm);height:20px;overflow:hidden}
-.bar-fill{display:block;height:100%;background:var(--accent);border-radius:var(--radius-sm)}
+.bar-fill{display:block;height:100%;background:var(--accent);border-radius:var(--radius-sm);min-width:3px}
+.prev{display:grid;grid-template-columns:1fr 54px 62px;gap:12px;align-items:center;margin:0 0 20px}
+.prev .num{text-align:right}
+.prev .of{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3)}
 .num{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3);text-align:right}
 .stack{display:flex;height:20px;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-2);gap:2px}
 .stack i{display:block;height:100%}
@@ -797,6 +800,24 @@ def anchor_for(D, cid):
     return min(pool, key=lambda p: abs(len(p[1]["text"]) - mid))[1], False
 
 
+def prevalence_bar(hits, total, units, cid=""):
+    """One code's prevalence, drawn against the whole frame rather than the leader.
+
+    Scaled 0-100, not to the most common code. A bar scaled to the leader makes
+    the top code look total whatever it actually reached, which is the wrong
+    impression to give about a corpus where nothing passes a third. The cost is
+    that a rare code draws a sliver, so a non-zero value gets a minimum width -
+    "rare" and "never" must not look the same.
+    """
+    pct = round(100 * hits / total, 1) if total else 0.0
+    fill = (f'<span class="bar-fill" style="width:{pct:.1f}%"></span>'
+            if pct else "")
+    return (f'<div class="prev" title="{esc(cid)}: {hits} of {total} {esc(units)}">'
+            f'<span class="bar-track">{fill}</span>'
+            f'<span class="num">{pct}%</span>'
+            f'<span class="of">{hits}/{total}</span></div>')
+
+
 def codebook_page(D):
     known = set(D["codes"])
     n = len(D["keys"])
@@ -829,14 +850,13 @@ def codebook_page(D):
                             c.get("include"), c.get("exclude"))).lower()
             H.append(f'<figure class="fig" id="{esc(cid)}" '
                      f'data-lens="{esc(lens)}" data-search="{esc(hay)}">'
-                     f'<h3>{esc(cid)} <span class="num" style="float:right">'
-                     f'{round(100*hits/n, 1) if n else 0}%</span></h3>'
-                     f'<p class="sub" style="margin:2px 0 10px">{esc(c.get("name", ""))}'
-                     f' &middot; {hits} of {n} {D["units"]}'
+                     f'<h3>{esc(cid)}</h3>'
+                     f'<p class="sub" style="margin:2px 0 12px">{esc(c.get("name", ""))}'
                      + (f' &middot; declared {esc(c["valence"])}' if c.get("valence") else "")
                      + (' &middot; ' + ", ".join(f"{k or 'unjudged'} {v}"
                                                  for k, v in spread.most_common())
-                        if spread else "") + '</p>')
+                        if spread else "") + '</p>'
+                     + prevalence_bar(hits, n, D["units"], cid))
             if c.get("definition"):
                 H.append(f'<p class="note">{esc(c["definition"])}</p>')
             for field in ("include", "exclude"):

@@ -246,6 +246,13 @@ showing what it means. Code ids mentioned in an exclude rule become links, since
 those rules are mostly cross-references and following them by hand is how a
 codebook stops being read.
 
+Each code carries a prevalence bar on a **0–100 scale**, not scaled to the most
+common code: a bar scaled to the leader makes the top code look total whatever it
+actually reached, which is the wrong impression to give about a corpus where
+nothing passes a third. A rare code therefore draws a sliver, so a non-zero value
+gets a minimum width — *rare* and *never* must not look the same, and only zero
+draws nothing.
+
 The example passage comes from the `anchor` column of `codes.csv` if you put an
 `excerpt_id` there. If you do not, one is chosen — preferring a coding you
 annotated, then the one closest to the median length for that code, because the
