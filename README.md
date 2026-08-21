@@ -405,6 +405,17 @@ the work is assigning them to roles. **An image or a URL is why this involves a
 model at all**: it must see the thing, so the CLI is granted `Read` for a file or
 `WebFetch` for a page, one tool, only for that call. Fonts come back too.
 
+### A theme is more than a palette
+
+Each theme carries its own **typography and shape** as well as colours, so
+switching one changes the page rather than repainting it. Chalk has square
+corners, a 2px rule and one plain face throughout, because the point of a
+high-contrast theme is that nothing is soft. Dusk has 9px corners and a serif
+body, because it is the one for reading at length.
+
+A theme that names none of its own falls back to the project's, and then to the
+defaults — so you can still set one typeface for everything if you prefer.
+
 ### Tokens worth knowing
 
 | | |

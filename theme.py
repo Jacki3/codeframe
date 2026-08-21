@@ -97,7 +97,13 @@ BUILTIN = {
     "mark": "#4A431C", "mark-ink": "#F0E9BE", "warn": "#CC9186"}},
 
  "chalk": {"label": "Chalk - high contrast", "scheme": "light",
-           "shadow": SHADOW["none"], "tokens": {
+           "shadow": SHADOW["none"],
+           # square corners, a heavier rule and one plain face throughout: the
+           # point of this theme is that nothing is soft or decorative
+           "shape": {"radius": "0px", "radius-sm": "0px", "border": "2px"},
+           "fonts": {"font-display": '"Segoe UI",-apple-system,'
+                                     'BlinkMacSystemFont,Arial,sans-serif'},
+           "tokens": {
     "ground": "#FFFFFF", "surface": "#FFFFFF", "surface-2": "#F4F4F2",
     "ink": "#0E0E12", "ink-2": "#3A3A44", "ink-3": "#5A5964",
     "rule": "#B9B7B1", "rule-soft": "#D6D4CE",
@@ -109,7 +115,12 @@ BUILTIN = {
     "series-a": "#5A5964", "series-b": "#5E3462",
     "mark": "#FBF0A8", "mark-ink": "#2E2A08", "warn": "#772F25"}},
 
- "dusk": {"label": "Dusk", "scheme": "dark", "shadow": SHADOW["dark"], "tokens": {
+ "dusk": {"label": "Dusk", "scheme": "dark", "shadow": SHADOW["dark"],
+          # softer corners and a serif body: this one is for reading at length
+          "shape": {"radius": "9px", "radius-sm": "5px", "border": "1px"},
+          "fonts": {"font-body": 'Charter,"Iowan Old Style",Georgia,'
+                                 '"Times New Roman",serif'},
+          "tokens": {
     "ground": "#12161B", "surface": "#1A2026", "surface-2": "#212831",
     "ink": "#E4E9EF", "ink-2": "#9FAAB8", "ink-3": "#84909E",
     "rule": "#2B333D", "rule-soft": "#232A33",
@@ -456,19 +467,28 @@ def css_vars(project):
     both directions or "Sarsen" is unusable on a machine set to dark.
     """
     themes = project.get("themes") or BUILTIN
-    fonts = {**DEFAULT_FONTS, **(project.get("fonts") or {})}
     dflt = project.get("default") if project.get("default") in themes else next(iter(themes))
 
     def body(spec):
-        t = spec.get("tokens") or {}
-        out = "".join(f"  --{k}:{t.get(k, '#888888')};\n" for k in COLOURS)
-        return out + f"  --shadow:{spec.get('shadow', SHADOW['light'])};\n"
+        """Everything a theme controls - colours, type and shape alike.
 
-    shape = {**SHAPE, **(project.get("shape") or {})}
+        Typography and corner radius live in the theme, not on :root. Emitting
+        them once meant switching theme repainted the page and changed nothing
+        else, so a serif theme and a square high-contrast theme were the same
+        page in different colours. A theme that does not name its own falls back
+        to the project's, and then to the defaults.
+        """
+        t = spec.get("tokens") or {}
+        fonts = {**DEFAULT_FONTS, **(project.get("fonts") or {}),
+                 **(spec.get("fonts") or {})}
+        shape = {**SHAPE, **(project.get("shape") or {}), **(spec.get("shape") or {})}
+        return ("".join(f"  --{k}:{t.get(k, '#888888')};\n" for k in COLOURS)
+                + f"  --shadow:{spec.get('shadow', SHADOW['light'])};\n"
+                + "".join(f"  --{k}:{v};\n" for k, v in fonts.items())
+                + "".join(f"  --{k}:{v};\n" for k, v in shape.items()))
+
     css = (":root{\n  color-scheme:" + themes[dflt].get("scheme", "light") + ";\n"
-           + body(themes[dflt])
-           + "".join(f"  --{k}:{v};\n" for k, v in fonts.items())
-           + "".join(f"  --{k}:{v};\n" for k, v in shape.items()) + "}\n")
+           + body(themes[dflt]) + "}\n")
     for name, spec in themes.items():
         css += (f'[data-theme="{name}"]{{\n  color-scheme:'
                 + spec.get("scheme", "light") + ";\n" + body(spec) + "}\n")
@@ -512,10 +532,17 @@ def head_extra(project, key="codeframe-theme"):
     out = head_script(key)
     if project.get("favicon"):
         out += f'<link rel="icon" href="{project["favicon"]}">'
-    if project.get("google_fonts"):
+    # every theme is in the page, so every theme's webfont must be available -
+    # linking only the default's leaves the others falling back silently
+    urls = []
+    for u in [project.get("google_fonts")] + [
+            (t or {}).get("google_fonts") for t in (project.get("themes") or {}).values()]:
+        if u and u not in urls:
+            urls.append(u)
+    if urls:
         out += ('<link rel="preconnect" href="https://fonts.googleapis.com">'
-                '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-                f'<link rel="stylesheet" href="{project["google_fonts"]}">')
+                '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>')
+        out += "".join(f'<link rel="stylesheet" href="{u}">' for u in urls)
     return out
 
 
@@ -707,9 +734,15 @@ def show(project):
         bad, _ = validate_one(name, spec)
         t = spec.get("tokens") or {}
         mark = "*" if name == project.get("default") else " "
-        print(f"{mark} {name:<11} {spec.get('label', name)[:24]:<26} "
+        own = []
+        if spec.get("fonts"):
+            own.append((spec["fonts"].get("font-body") or "?").split(",")[0].strip("'\""))
+        if spec.get("shape"):
+            own.append("r" + str(spec["shape"].get("radius", "?")))
+        print(f"{mark} {name:<11} {spec.get('label', name)[:22]:<24} "
               f"{spec.get('scheme', 'light'):<6} {t.get('ground', '?')} "
-              f"{t.get('accent', '?')}  {'ok' if not bad else 'FAILS'}")
+              f"{t.get('accent', '?')}  {'ok' if not bad else 'FAILS':<6}"
+              + ("  " + " ".join(own) if own else ""))
 
 
 def main():
@@ -749,16 +782,18 @@ def main():
             raise SystemExit(
                 f"\nnot added - {len(bad)} readability check(s) failed.\n"
                 "  Try another source, or --force if you know better than the maths.")
-        project["themes"][name] = spec
+        # type and shape belong to the theme, so adding a second one does not
+        # quietly restyle the first
         if reply.get("fonts"):
-            project["fonts"] = {**DEFAULT_FONTS, **reply["fonts"]}
+            spec["fonts"] = {k: v for k, v in reply["fonts"].items() if k in FONTS}
         if reply.get("google_fonts"):
-            project["google_fonts"] = reply["google_fonts"]
+            spec["google_fonts"] = reply["google_fonts"]
         if isinstance(reply.get("shape"), dict):
             keep = {k: str(v)[:12] for k, v in reply["shape"].items()
                     if k in SHAPE and re.fullmatch(r"[0-9.]+(px|rem|em)", str(v))}
             if keep:
-                project["shape"] = {**SHAPE, **keep}
+                spec["shape"] = keep
+        project["themes"][name] = spec
         project["default"] = name
         changed = True
         print(f"\nadded theme {name!r} ({spec['label']}) and made it the default")
