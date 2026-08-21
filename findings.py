@@ -37,7 +37,7 @@ except (AttributeError, ValueError):
     pass
 
 csv.field_size_limit(10 ** 8)
-TH = theme.BUILTIN["default"]   # replaced by load()
+TH = theme.blank()   # the whole theme set; replaced by load()
 KINDS = ("prevalence", "valence", "split", "measures", "dependence",
          "cooccur")
 VALENCE_ORDER = ("pos", "mixed", "neutral", "neg", "")
@@ -312,24 +312,38 @@ def default_specs(D):
 
 CSS_RULES = """
 *{box-sizing:border-box}
-body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--body)}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;
+ flex-wrap:wrap;margin-bottom:8px}
+.figures{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 26px}
+.figures div{background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+ padding:9px 14px;box-shadow:var(--shadow)}
+.figures b{display:block;font:600 20px/1.2 var(--font-display);color:var(--ink)}
+.figures span{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;
+ text-transform:uppercase;color:var(--ink-3)}
+h1,h2,h3{font-family:var(--font-display);font-weight:600}
+.fig{box-shadow:var(--shadow)}
+.rule-inc,.rule-exc{border-radius:2px;padding:7px 11px;margin:7px 0}
+.rule-inc{background:var(--include-wash);color:var(--include)}
+.rule-exc{background:var(--exclude-wash);color:var(--exclude)}
+.rule-inc .tag,.rule-exc .tag{background:transparent;color:inherit;opacity:.75}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--font-body)}
 .wrap{max-width:980px;margin:0 auto;padding:34px 24px 100px}
 h1{font-size:25px;margin:0 0 4px}
 h2{font-size:18px;margin:44px 0 0;padding-top:20px;border-top:1px solid var(--rule)}
 h3{font-size:16px;margin:0 0 3px}
-.sub{color:var(--ink-3);font-family:var(--mono);font-size:11.5px;margin:0 0 26px;line-height:1.7}
-nav{margin:0 0 26px;font-family:var(--mono);font-size:12px}
+.sub{color:var(--ink-3);font-family:var(--font-mono);font-size:11.5px;margin:0 0 26px;line-height:1.7}
+nav{margin:0 0 26px;font-family:var(--font-mono);font-size:12px}
 nav a{color:var(--accent-ink);margin-right:14px}
 .fig{background:var(--surface);border:1px solid var(--rule);border-radius:4px;
  padding:19px 22px;margin:16px 0 0}
 figcaption{color:var(--ink-3);font-size:12.5px;margin-top:13px;line-height:1.6}
 .bar-row{display:grid;grid-template-columns:210px 1fr 62px;gap:11px;align-items:center;
  margin-bottom:5px;font-size:13.5px}
-.lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);
+.lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);
  font-size:11.5px;color:var(--ink-2)}
 .bar-track{display:block;background:var(--surface-2);border-radius:2px;height:17px;overflow:hidden}
 .bar-fill{display:block;height:100%;background:var(--accent);border-radius:2px}
-.num{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);text-align:right}
+.num{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3);text-align:right}
 .stack{display:flex;height:17px;border-radius:2px;overflow:hidden;background:var(--surface-2)}
 .stack i{display:block;height:100%}
 .pos{background:var(--pos)}
@@ -337,21 +351,21 @@ figcaption{color:var(--ink-3);font-size:12.5px;margin-top:13px;line-height:1.6}
 .neutral{background:var(--neutral)}.none{background:var(--none)}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;font-size:13px;min-width:420px}
-th{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
  color:var(--ink-3);text-align:left;padding:0 6px 7px;font-weight:400}
 th.r,td.r{text-align:right}
 td{padding:4px 6px;border-top:1px solid var(--rule)}
-td.code{font-family:var(--mono);font-size:11px;color:var(--ink-2);white-space:nowrap}
-.cell{text-align:center;font-family:var(--mono);font-size:11px;border-radius:2px}
-.key{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:11px}
+td.code{font-family:var(--font-mono);font-size:11px;color:var(--ink-2);white-space:nowrap}
+.cell{text-align:center;font-family:var(--font-mono);font-size:11px;border-radius:2px}
+.key{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);margin-top:11px}
 .key i{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;
  margin:0 4px 0 12px}
 .q{background:var(--surface-2);border-left:3px solid var(--accent);border-radius:2px;
  padding:9px 13px;margin:9px 0;font-size:14px;color:var(--ink-2)}
-.q cite{display:block;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+.q cite{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);
  font-style:normal;margin-top:6px}
 .note{font-size:14px;margin:5px 0 14px}
-.tag{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;
+.tag{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;
  color:var(--accent-ink);background:var(--accent-wash);padding:2px 7px;border-radius:2px}
 .ai{border-left:3px solid var(--mixed);padding-left:13px;margin:11px 0}
 .ai .tag{color:var(--mixed);background:transparent;padding:0}
@@ -359,7 +373,30 @@ td.code{font-family:var(--mono);font-size:11px;color:var(--ink-2);white-space:no
 """
 
 
+def figures(D):
+    """The headline numbers, so a reader knows the size of the thing at a glance."""
+    n_x = len({c["excerpt_id"] for c in D["codings"]})
+    touched = len({k for cid in D["plays"] for k in D["plays"][cid]})
+    cells = [(len(D["codes"]), "codes"),
+             (len({(c.get("lens") or "").strip() for c in D["codes"].values()
+                   if (c.get("lens") or "").strip()}), "lenses"),
+             (len(D["keys"]), D["units"]),
+             (len({r["pid"] for r in D["frame"]}), "participants"),
+             (n_x, "excerpts"),
+             (len(D["codings"]), "codings"),
+             (touched, f"{D['units']} coded")]
+    return ('<div class="figures">'
+            + "".join(f'<div><b>{v}</b><span>{esc(l)}</span></div>' for v, l in cells)
+            + '</div>')
+
+
+def header(title, sub):
+    return (f'<div class="topbar"><div><h1>{esc(title)}</h1>'
+            f'<p class="sub">{sub}</p></div>{theme.picker(TH)}</div>')
+
+
 NAV = ('<nav><a href="findings.html">Findings</a>'
+       
        '<a href="codebook.html">Codebook</a>'
        '<a href="discussion.html">Discussion</a></nav>')
 
@@ -489,15 +526,11 @@ def page(D, specs, results, title="Findings"):
     H = [f'<!doctype html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width,initial-scale=1">',
          f'<title>{esc(title)}</title>{theme.head_extra(TH)}'
-         f'<style>{theme.css_vars(TH)}{CSS_RULES}</style>'
+         f'<style>{theme.css_vars(TH)}{CSS_RULES}{theme.PICKER_CSS}</style>'
          '</head><body><div class="wrap">',
-         f'<h1>{esc(title)}</h1>',
-         f'<p class="sub">{len(D["keys"])} {D["units"]} &middot; '
-         f'{len({r["pid"] for r in D["frame"]})} participants &middot; '
-         f'{len(D["codes"])} codes &middot; {n_x} excerpts &middot; {n_cod} codings<br>'
-         f'{touched} of {len(D["keys"])} {D["units"]} have at least one coding'
-         f'</p>',
-         NAV]
+         header(title, f'{touched} of {len(D["keys"])} {D["units"]} '
+                       f'have at least one coding'),
+         NAV, figures(D)]
     for spec, res in zip(specs, results):
         H.append(draw(D, spec, res))
     H.append('</div></body></html>')
@@ -624,12 +657,11 @@ def codebook_page(D):
     H = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width,initial-scale=1">',
          f'<title>Codebook</title>{theme.head_extra(TH)}'
-         f'<style>{theme.css_vars(TH)}{CSS_RULES}</style>'
+         f'<style>{theme.css_vars(TH)}{CSS_RULES}{theme.PICKER_CSS}</style>'
          '</head><body><div class="wrap">',
-         '<h1>Codebook</h1>',
-         f'<p class="sub">{len(D["codes"])} codes in {len(by_lens)} lenses &middot; '
-         f'prevalence is the share of {n} {D["units"]} carrying the code</p>',
-         NAV,
+         header('Codebook', f'prevalence is the share of {n} {D["units"]} '
+                            f'carrying the code'),
+         NAV, figures(D),
          '<p class="key" style="margin-bottom:18px">' + " ".join(
              f'<a href="#{esc(L)}">{esc(L)}</a> <span style="color:var(--ink-3)">'
              f'{len(cs)}</span>' for L, cs in sorted(by_lens.items())) + '</p>']
@@ -656,7 +688,8 @@ def codebook_page(D):
                 H.append(f'<p class="note">{esc(c["definition"])}</p>')
             for field in ("include", "exclude"):
                 if (c.get(field) or "").strip():
-                    H.append(f'<p class="note"><span class="tag">{field}</span> '
+                    cls = "rule-inc" if field == "include" else "rule-exc"
+                    H.append(f'<p class="note {cls}"><span class="tag">{field}</span> '
                              f'{linkify(c[field].strip(), known)}</p>')
             if x:
                 where = " &middot; ".join(filter(None, [
@@ -753,12 +786,11 @@ def discussion_page(D, notes, summaries, standing=()):
     H = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width,initial-scale=1">',
          f'<title>Discussion</title>{theme.head_extra(TH)}'
-         f'<style>{theme.css_vars(TH)}{CSS_RULES}</style>'
+         f'<style>{theme.css_vars(TH)}{CSS_RULES}{theme.PICKER_CSS}</style>'
          '</head><body><div class="wrap">',
-         '<h1>Discussion</h1>',
-         f'<p class="sub">'
-         + (f'{len(standing)} notes about the study &middot; ' if standing else '')
-         + f'{total} coding notes across {len(notes)} codes</p>',
+         header('Discussion',
+                (f'{len(standing)} notes about the study &middot; ' if standing else '')
+                + f'{total} coding notes across {len(notes)} codes'),
          NAV,
          draw_standing(standing),
          ('<h2>By lens</h2><p class="sub" style="margin:6px 0 0">Notes written '

@@ -1,37 +1,43 @@
-"""Choose how the pages look, and check that the result is readable.
+"""Themes: what the pages ship with, and which one a reader gets.
 
     python theme.py --data ../myproject                       # what is set
-    python theme.py --data ../myproject --list                # the built-in themes
-    python theme.py --data ../myproject --set paper
-    python theme.py --data ../myproject --from palette.png    # match an image
-    python theme.py --data ../myproject --from https://…      # match a site
-    python theme.py --data ../myproject --from "#1b3a2f,#e8e4d9,#c2703d"
+    python theme.py --data ../myproject --list                # themes in the project
+    python theme.py --data ../myproject --default chalk       # which one opens first
+    python theme.py --data ../myproject --from palette.png    # add one from an image
+    python theme.py --data ../myproject --from https://…      # add one from a site
+    python theme.py --data ../myproject --from "#173C2E,#E8E4D9,#C2703D" --name understory
+    python theme.py --data ../myproject --drop understory
     python theme.py --data ../myproject --favicon logo.png
 
-Themes live in <project>/theme.json and are read by every page and by the coding
-tool, so all four surfaces move together.
+A project ships SEVERAL themes, not one. Every page carries all of them and a
+picker in the corner, so the reader chooses - "Match my system" hands control back
+to their own light/dark setting. The choice is remembered in localStorage per
+reader, and --default only decides which one opens before they choose.
 
-MATCHING SOMETHING
+That is the important difference from a build-time theme: a reader who needs high
+contrast should not have to ask the author for a rebuild.
 
-A palette given as hex needs no model - the colours are already the answer, and
-the work is only assigning them to roles. An image or a site does need one, and it
-needs to SEE the thing: --from a file lets the CLI read the image, --from a URL
-lets it fetch the page. That is the whole reason this goes through a model at all.
+TOKENS
 
-READABILITY IS NOT TAKEN ON TRUST
+Beyond the obvious surfaces and inks, three pairs carry meaning and are worth
+knowing about:
 
-Whatever comes back is checked here, in Python, before it is written:
+    include / exclude   the two halves of a code definition. Green-ish and
+                        red-ish deliberately: these are inclusion and exclusion
+                        rules, and unlike pos/neg they are never compared to each
+                        other in a chart, so hue may carry the distinction.
+    pos / neg           favourable and unfavourable. These ARE compared, in
+                        stacked bars, so they are blue and orange and are checked
+                        against a deuteranopia simulation before shipping.
+    series-a / series-b extra chart series beyond the valence pair.
 
-  - body text against its background, to WCAG AA (4.5:1); secondary and muted ink
-    to their own floors
-  - the valence colours against the surface they sit on (3:1, they are marks)
-  - pos against neg under deuteranopia, because those two carry opposite meanings
-    and a reader who cannot tell them apart is reading the opposite finding
+READABILITY IS COMPUTED, NOT TAKEN ON TRUST
 
-A theme that fails is reported and not written unless you insist. This is the same
-rule as everywhere else here: the model proposes, the arithmetic is done locally.
+Every theme in the project is checked before anything is written: contrast for
+text and marks, and pos-against-neg under deuteranopia. A theme that fails is
+reported and not written unless you pass --force.
 """
-import argparse, base64, colorsys, json, math, os, re, sys
+import argparse, base64, json, math, os, re, sys
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -39,71 +45,78 @@ try:
 except (AttributeError, ValueError):
     pass
 
-# Every custom property the pages and the coding tool use, in one place.
-TOKENS = ["ground", "surface", "surface-2", "ink", "ink-2", "ink-3",
-          "rule", "rule-soft", "accent", "accent-ink", "accent-wash",
-          "mark", "mark-ink", "warn", "pos", "neg", "mixed", "neutral", "none"]
-FONTS = ["body", "mono"]
+COLOURS = ["ground", "surface", "surface-2", "ink", "ink-2", "ink-3",
+           "rule", "rule-soft", "accent", "accent-ink", "accent-wash",
+           "include", "include-wash", "exclude", "exclude-wash",
+           "pos", "neg", "mixed", "neutral", "none", "series-a", "series-b",
+           "mark", "mark-ink", "warn"]
+FONTS = ["font-display", "font-body", "font-mono"]
 
 DEFAULT_FONTS = {
-    "body": '"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif',
-    "mono": 'Consolas,"Cascadia Mono","SF Mono",Menlo,monospace',
+    "font-display": '"Palatino Linotype","Book Antiqua",Palatino,'
+                    '"Iowan Old Style",Georgia,serif',
+    "font-body": '"Segoe UI",-apple-system,BlinkMacSystemFont,'
+                 '"Helvetica Neue",Arial,sans-serif',
+    "font-mono": 'Consolas,"Cascadia Mono","SF Mono",Menlo,monospace',
 }
 
+SHADOW = {
+    "light": "0 1px 2px rgba(34,33,42,.05), 0 8px 24px -16px rgba(34,33,42,.22)",
+    "dark": "0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.7)",
+    "none": "none",
+}
+
+# The four the pages ship with. "scheme" tells the browser which system setting
+# this theme belongs to, and which one "Match my system" falls back to.
 BUILTIN = {
-    "default": {
-        "name": "default", "fonts": DEFAULT_FONTS,
-        "light": {"ground": "#F2F2EF", "surface": "#FFFFFF", "surface-2": "#F8F8F5",
-                  "ink": "#22212A", "ink-2": "#56545F", "ink-3": "#86848F",
-                  "rule": "#E0DFDA", "rule-soft": "#EBEAE6",
-                  "accent": "#6B7233", "accent-ink": "#4E541F", "accent-wash": "#EDEFE0",
-                  "mark": "#EDE8B8", "mark-ink": "#3F3A12", "warn": "#8A4B42",
-                  "pos": "#1F6FA8", "neg": "#C0651F", "mixed": "#8A6A12",
-                  "neutral": "#6B6976", "none": "#C9C7C0"},
-        "dark": {"ground": "#17171B", "surface": "#1F1F25", "surface-2": "#25252C",
-                 "ink": "#EDECEE", "ink-2": "#A9A7B2", "ink-3": "#8E8C98",
-                 "rule": "#31313A", "rule-soft": "#292930",
-                 "accent": "#A8B45C", "accent-ink": "#C3CE84", "accent-wash": "#2A2D1E",
-                 "mark": "#4A431C", "mark-ink": "#F0E9BE", "warn": "#CC9186",
-                 "pos": "#5EA8D8", "neg": "#E0954E", "mixed": "#D9BC63",
-                 "neutral": "#A5A3AF", "none": "#45444D"},
-    },
-    "paper": {
-        "name": "paper", "fonts": {
-            "body": 'Charter,"Iowan Old Style",Georgia,"Times New Roman",serif',
-            "mono": '"SF Mono",Consolas,Menlo,monospace'},
-        "light": {"ground": "#F6F3EC", "surface": "#FFFDF8", "surface-2": "#F1EDE3",
-                  "ink": "#211E1A", "ink-2": "#544F46", "ink-3": "#807A6E",
-                  "rule": "#DED8CA", "rule-soft": "#E9E4D8",
-                  "accent": "#7A4A22", "accent-ink": "#5E3818", "accent-wash": "#F0E4D6",
-                  "mark": "#F0E0B4", "mark-ink": "#4A3A12", "warn": "#8E3F32",
-                  "pos": "#26688F", "neg": "#B45F22", "mixed": "#836411",
-                  "neutral": "#6C665C", "none": "#CFC8B8"},
-        "dark": {"ground": "#191713", "surface": "#221F1A", "surface-2": "#2A261F",
-                 "ink": "#F1EBDF", "ink-2": "#B2AA9A", "ink-3": "#918977",
-                 "rule": "#39342B", "rule-soft": "#302B23",
-                 "accent": "#C99763", "accent-ink": "#DDB488", "accent-wash": "#2E251A",
-                 "mark": "#4A3C1B", "mark-ink": "#F3E7C4", "warn": "#D08C7C",
-                 "pos": "#63A6CE", "neg": "#DC9350", "mixed": "#D3B75F",
-                 "neutral": "#A9A294", "none": "#413B31"},
-    },
-    "slate": {
-        "name": "slate", "fonts": DEFAULT_FONTS,
-        "light": {"ground": "#EFF1F4", "surface": "#FFFFFF", "surface-2": "#F5F7F9",
-                  "ink": "#1B2027", "ink-2": "#4B535E", "ink-3": "#79818C",
-                  "rule": "#DDE1E7", "rule-soft": "#E9ECF0",
-                  "accent": "#2B5C8A", "accent-ink": "#1F4568", "accent-wash": "#E2ECF5",
-                  "mark": "#D8E6F2", "mark-ink": "#173047", "warn": "#9A3B33",
-                  "pos": "#2B5F8C", "neg": "#B5651D", "mixed": "#8A6A12",
-                  "neutral": "#6A727D", "none": "#C6CBD2"},
-        "dark": {"ground": "#12161B", "surface": "#1A1F26", "surface-2": "#20262E",
-                 "ink": "#E9EDF2", "ink-2": "#A3ABB6", "ink-3": "#868E99",
-                 "rule": "#2C333C", "rule-soft": "#242A32",
-                 "accent": "#6FA8DC", "accent-ink": "#95C2E8", "accent-wash": "#1B2A38",
-                 "mark": "#26384A", "mark-ink": "#D6E6F5", "warn": "#D18B80",
-                 "pos": "#5FA3CC", "neg": "#D98F4A", "mixed": "#D5B860",
-                 "neutral": "#9FA7B2", "none": "#3B424B"},
-    },
+ "light": {"label": "Sarsen", "scheme": "light", "shadow": SHADOW["light"], "tokens": {
+    "ground": "#F2F2EF", "surface": "#FFFFFF", "surface-2": "#F8F8F5",
+    "ink": "#22212A", "ink-2": "#56545F", "ink-3": "#86848F",
+    "rule": "#E0DFDA", "rule-soft": "#EBEAE6",
+    "accent": "#6B7233", "accent-ink": "#4E541F", "accent-wash": "#EDEFE0",
+    "include": "#4A6B4F", "include-wash": "#E9F0EA",
+    "exclude": "#8A4B42", "exclude-wash": "#F4E9E7",
+    "pos": "#1F6FB8", "neg": "#C0731F", "mixed": "#8A6A12",
+    "neutral": "#6B6976", "none": "#C9C7C0",
+    "series-a": "#86848F", "series-b": "#7A4A7E",
+    "mark": "#EDE8B8", "mark-ink": "#3F3A12", "warn": "#8A4B42"}},
+
+ "dark": {"label": "Sarsen dark", "scheme": "dark", "shadow": SHADOW["dark"], "tokens": {
+    "ground": "#17171B", "surface": "#1F1F25", "surface-2": "#25252C",
+    "ink": "#EDECEE", "ink-2": "#A9A7B2", "ink-3": "#8E8C98",
+    "rule": "#31313A", "rule-soft": "#292930",
+    "accent": "#A8B45C", "accent-ink": "#C3CE84", "accent-wash": "#2A2D1E",
+    "include": "#8FB396", "include-wash": "#1E271F",
+    "exclude": "#CC9186", "exclude-wash": "#2B1F1D",
+    "pos": "#5EA8D8", "neg": "#E0954E", "mixed": "#D9BC63",
+    "neutral": "#A5A3AF", "none": "#45444D",
+    "series-a": "#9A98A3", "series-b": "#B98BBE",
+    "mark": "#4A431C", "mark-ink": "#F0E9BE", "warn": "#CC9186"}},
+
+ "chalk": {"label": "Chalk - high contrast", "scheme": "light",
+           "shadow": SHADOW["none"], "tokens": {
+    "ground": "#FFFFFF", "surface": "#FFFFFF", "surface-2": "#F4F4F2",
+    "ink": "#0E0E12", "ink-2": "#3A3A44", "ink-3": "#5A5964",
+    "rule": "#B9B7B1", "rule-soft": "#D6D4CE",
+    "accent": "#4A5416", "accent-ink": "#3A4210", "accent-wash": "#E4E8CE",
+    "include": "#2F5237", "include-wash": "#DCE8DF",
+    "exclude": "#772F25", "exclude-wash": "#F0DCD8",
+    "pos": "#12558F", "neg": "#8F5312", "mixed": "#6B4E0A",
+    "neutral": "#4E4D57", "none": "#C2C0BA",
+    "series-a": "#5A5964", "series-b": "#5E3462",
+    "mark": "#FBF0A8", "mark-ink": "#2E2A08", "warn": "#772F25"}},
+
+ "dusk": {"label": "Dusk", "scheme": "dark", "shadow": SHADOW["dark"], "tokens": {
+    "ground": "#12161B", "surface": "#1A2026", "surface-2": "#212831",
+    "ink": "#E4E9EF", "ink-2": "#9FAAB8", "ink-3": "#84909E",
+    "rule": "#2B333D", "rule-soft": "#232A33",
+    "accent": "#D2A857", "accent-ink": "#E4C282", "accent-wash": "#2E2717",
+    "include": "#7FA9A2", "include-wash": "#17262A",
+    "exclude": "#C98878", "exclude-wash": "#2A1D1B",
+    "pos": "#5EA8D8", "neg": "#E0954E", "mixed": "#D2A857",
+    "neutral": "#9AA5B2", "none": "#2B333D",
+    "series-a": "#84909E", "series-b": "#B98BBE",
+    "mark": "#3A3320", "mark-ink": "#F2E7C0", "warn": "#C98878"}},
 }
 
 
@@ -132,10 +145,8 @@ def luminance(rgb):
 
 
 def contrast(a, b):
-    """WCAG contrast ratio between two colours, 1.0 to 21.0."""
     la, lb = luminance(a), luminance(b)
-    hi, lo = max(la, lb), min(la, lb)
-    return (hi + 0.05) / (lo + 0.05)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 
 
 def deuter(rgb):
@@ -144,11 +155,10 @@ def deuter(rgb):
     m = ((0.367322, 0.860646, -0.227968),
          (0.280085, 0.672501, 0.047413),
          (-0.011820, 0.042940, 0.968881))
-    out = [sum(mi[j] * v for j, v in enumerate((r, g, b))) for mi in m]
     def unlin(c):
         c = max(0.0, min(1.0, c))
         return 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
-    return tuple(unlin(c) for c in out)
+    return tuple(unlin(sum(mi[j] * v for j, v in enumerate((r, g, b)))) for mi in m)
 
 
 def oklab(rgb):
@@ -163,60 +173,61 @@ def oklab(rgb):
 
 
 def delta_e(a, b):
-    """OKLab distance, x100 - the same scale the palette guidance uses."""
     return 100 * math.dist(oklab(a), oklab(b))
 
 
 CHECKS = [
-    # (label, foreground token, background token, minimum, why)
-    ("body text", "ink", "ground", 4.5, "the text everything is read in"),
-    ("body on card", "ink", "surface", 4.5, "most text sits on a card, not the ground"),
-    ("secondary ink", "ink-2", "surface", 4.5, "definitions and note bodies"),
-    ("muted ink", "ink-3", "surface", 3.0, "captions and provenance lines"),
-    ("accent ink", "accent-ink", "accent-wash", 4.5, "tags and code ids"),
-    ("accent mark", "accent", "surface-2", 3.0, "the bars on the findings page"),
-    ("pos mark", "pos", "surface", 3.0, "valence marks are marks, not text"),
-    ("neg mark", "neg", "surface", 3.0, ""),
-    ("mixed mark", "mixed", "surface", 3.0, ""),
+    ("body text on ground", "ink", "ground", 4.5),
+    ("body text on a card", "ink", "surface", 4.5),
+    ("secondary ink", "ink-2", "surface", 4.5),
+    ("muted ink", "ink-3", "surface", 3.0),
+    ("accent ink on its wash", "accent-ink", "accent-wash", 4.5),
+    ("accent mark", "accent", "surface-2", 3.0),
+    ("include text on its wash", "include", "include-wash", 4.5),
+    ("exclude text on its wash", "exclude", "exclude-wash", 4.5),
+    ("pos mark", "pos", "surface", 3.0),
+    ("neg mark", "neg", "surface", 3.0),
+    ("mixed mark", "mixed", "surface", 3.0),
 ]
 
 
-def validate(theme):
-    """Every readability check, computed. Returns (problems, notes)."""
+def validate_one(name, spec):
     bad, notes = [], []
-    for mode in ("light", "dark"):
-        cols = theme.get(mode) or {}
-        missing = [t for t in TOKENS if not parse_hex(cols.get(t))]
-        if missing:
-            bad.append(f"{mode}: not a colour - {', '.join(missing[:6])}")
-            continue
-        for label, fg, bg, need, _ in CHECKS:
-            got = contrast(parse_hex(cols[fg]), parse_hex(cols[bg]))
-            if got < need:
-                bad.append(f"{mode}: {label} {got:.1f}:1, needs {need}:1 "
-                           f"({cols[fg]} on {cols[bg]})")
-            elif got < need + 0.6:
-                notes.append(f"{mode}: {label} only just passes at {got:.1f}:1")
-        # pos and neg carry OPPOSITE meanings; a reader who cannot separate them
-        # is reading the opposite finding, so this one is not a style preference.
-        d = delta_e(deuter(parse_hex(cols["pos"])), deuter(parse_hex(cols["neg"])))
-        if d < 8:
-            bad.append(f"{mode}: pos and neg are {d:.1f} apart under deuteranopia "
-                       f"(need 8) - they would read as the same colour")
-        elif d < 12:
-            notes.append(f"{mode}: pos/neg separation is thin at {d:.1f} under deuteranopia")
-        # mixed is a softer requirement, and deliberately so. Deuteranopia collapses
-        # hue onto roughly one blue-yellow axis, so once pos and neg hold the two
-        # poles there is no third hue left for mixed - every candidate lands on top
-        # of one of them. It is separated by the legend, by its fixed position in
-        # the stack, and by the stripe the stylesheet gives it, which is what the
-        # colour cannot do alone.
-        for other in ("pos", "neg"):
-            dm = delta_e(deuter(parse_hex(cols["mixed"])), deuter(parse_hex(cols[other])))
-            if dm < 8:
-                notes.append(
-                    f"{mode}: mixed sits {dm:.1f} from {other} under deuteranopia - "
-                    f"told apart by the stripe and the legend, not by colour")
+    t = spec.get("tokens") or {}
+    missing = [k for k in COLOURS if not parse_hex(t.get(k))]
+    if missing:
+        return [f"{name}: not colours - {', '.join(missing[:6])}"], []
+    for label, fg, bg, need in CHECKS:
+        got = contrast(parse_hex(t[fg]), parse_hex(t[bg]))
+        if got < need:
+            bad.append(f"{name}: {label} {got:.1f}:1, needs {need}:1 "
+                       f"({t[fg]} on {t[bg]})")
+        elif got < need + 0.5:
+            notes.append(f"{name}: {label} only just passes at {got:.1f}:1")
+    # pos and neg sit side by side in a stacked bar and mean opposite things
+    d = delta_e(deuter(parse_hex(t["pos"])), deuter(parse_hex(t["neg"])))
+    if d < 8:
+        bad.append(f"{name}: pos and neg are {d:.1f} apart under deuteranopia "
+                   f"(need 8) - a reader would get the opposite finding")
+    elif d < 12:
+        notes.append(f"{name}: pos/neg separation is thin at {d:.1f}")
+    # Deuteranopia collapses hue onto roughly one blue-yellow axis, so once pos and
+    # neg hold the poles there is no third hue left for mixed. It is separated by
+    # its stripe, the legend, and its fixed place in the stack - not by colour.
+    for other in ("pos", "neg"):
+        dm = delta_e(deuter(parse_hex(t["mixed"])), deuter(parse_hex(t[other])))
+        if dm < 8:
+            notes.append(f"{name}: mixed sits {dm:.1f} from {other} under "
+                         f"deuteranopia - told apart by its stripe and the legend")
+    return bad, notes
+
+
+def validate(project):
+    bad, notes = [], []
+    for name, spec in (project.get("themes") or {}).items():
+        b, n = validate_one(name, spec)
+        bad += b
+        notes += n
     return bad, notes
 
 
@@ -226,23 +237,30 @@ def path_of(root):
     return os.path.join(os.path.abspath(root), "theme.json")
 
 
+def blank():
+    return {"default": "light", "fonts": dict(DEFAULT_FONTS),
+            "themes": json.loads(json.dumps(BUILTIN))}
+
+
 def load(root):
     p = path_of(root)
     if os.path.exists(p):
         try:
             t = json.load(open(p, encoding="utf-8"))
-            if t.get("light") and t.get("dark"):
+            if t.get("themes"):
+                t.setdefault("fonts", dict(DEFAULT_FONTS))
+                t.setdefault("default", next(iter(t["themes"])))
                 return t
         except (json.JSONDecodeError, OSError):
             pass
-    return BUILTIN["default"]
+    return blank()
 
 
-def save(root, theme):
+def save(root, project):
     p = path_of(root)
     tmp = p + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(theme, f, indent=1)
+        json.dump(project, f, indent=1)
     os.replace(tmp, p)
     return p
 
@@ -252,7 +270,7 @@ MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
         ".ico": "image/x-icon"}
 
 
-def set_favicon(theme, path):
+def set_favicon(project, path):
     ext = os.path.splitext(path)[1].lower()
     if ext not in MIME:
         raise SystemExit(f"favicon must be one of {', '.join(sorted(MIME))}")
@@ -260,112 +278,168 @@ def set_favicon(theme, path):
     if len(raw) > 200_000:
         raise SystemExit(f"{path} is {len(raw)//1024}KB - it is inlined into every "
                          "page, so use something under 200KB")
-    theme["favicon"] = (f"data:{MIME[ext]};base64,"
-                        + base64.b64encode(raw).decode("ascii"))
-    theme["favicon_from"] = os.path.basename(path)
+    project["favicon"] = f"data:{MIME[ext]};base64," + base64.b64encode(raw).decode()
+    project["favicon_from"] = os.path.basename(path)
     return len(raw)
 
 
 # ------------------------------------------------------------------ output
 
-def css_vars(theme):
-    """The custom-property block the pages open their stylesheet with."""
-    fonts = {**DEFAULT_FONTS, **(theme.get("fonts") or {})}
-    def block(mode):
-        cols = theme.get(mode) or {}
-        return "".join(f"  --{t}:{cols.get(t, '#888888')};\n" for t in TOKENS)
-    return (":root{\n  color-scheme:light;\n" + block("light")
-            + f"  --body:{fonts['body']};\n  --mono:{fonts['mono']};\n}}\n"
-            + "@media (prefers-color-scheme:dark){:root{\n  color-scheme:dark;\n"
-            + block("dark") + "}}\n")
+def css_vars(project):
+    """Tokens for every theme: the default on :root, the rest behind data-theme.
+
+    The dark block is guarded with :root:not([data-theme]) so a reader's explicit
+    choice is not overridden by their system setting - the picker has to win in
+    both directions or "Sarsen" is unusable on a machine set to dark.
+    """
+    themes = project.get("themes") or BUILTIN
+    fonts = {**DEFAULT_FONTS, **(project.get("fonts") or {})}
+    dflt = project.get("default") if project.get("default") in themes else next(iter(themes))
+
+    def body(spec):
+        t = spec.get("tokens") or {}
+        out = "".join(f"  --{k}:{t.get(k, '#888888')};\n" for k in COLOURS)
+        return out + f"  --shadow:{spec.get('shadow', SHADOW['light'])};\n"
+
+    css = (":root{\n  color-scheme:" + themes[dflt].get("scheme", "light") + ";\n"
+           + body(themes[dflt])
+           + "".join(f"  --{k}:{v};\n" for k, v in fonts.items()) + "}\n")
+    for name, spec in themes.items():
+        css += (f'[data-theme="{name}"]{{\n  color-scheme:'
+                + spec.get("scheme", "light") + ";\n" + body(spec) + "}\n")
+    # a reader who has chosen nothing follows their system
+    sysdark = next((n for n, s in themes.items()
+                    if s.get("scheme") == "dark"), None)
+    if sysdark and themes[dflt].get("scheme") != "dark":
+        css += ("@media (prefers-color-scheme:dark){:root:not([data-theme]){\n"
+                "  color-scheme:dark;\n" + body(themes[sysdark]) + "}}\n")
+    return css
 
 
-def head_extra(theme):
-    """Anything that belongs in <head> beyond the stylesheet."""
+def head_extra(project):
     out = ""
-    if theme.get("favicon"):
-        out += f'<link rel="icon" href="{theme["favicon"]}">'
-    fam = theme.get("google_fonts")
-    if fam:
+    if project.get("favicon"):
+        out += f'<link rel="icon" href="{project["favicon"]}">'
+    if project.get("google_fonts"):
         out += ('<link rel="preconnect" href="https://fonts.googleapis.com">'
                 '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-                f'<link rel="stylesheet" href="{fam}">')
+                f'<link rel="stylesheet" href="{project["google_fonts"]}">')
     return out
+
+
+PICKER_CSS = """
+.themepick{display:flex;align-items:center;gap:7px}
+.themepick label{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;
+ text-transform:uppercase;color:var(--ink-3)}
+.themepick select{font:13px var(--font-body);color:var(--ink);background:var(--surface);
+ border:1px solid var(--rule);border-radius:3px;padding:4px 7px}
+"""
+
+PICKER_JS = """
+(function(){
+  var root=document.documentElement, KEY=%s,
+      host=root.getAttribute('data-theme'), sel=document.getElementById('theme');
+  if(!sel) return;
+  function set(v){
+    if(v&&v!=='system'){root.setAttribute('data-theme',v);}
+    else if(host){root.setAttribute('data-theme',host);}
+    else{root.removeAttribute('data-theme');}
+  }
+  var saved=null;
+  try{saved=localStorage.getItem(KEY);}catch(e){}
+  if(saved){sel.value=saved;set(saved);}
+  sel.addEventListener('change',function(){
+    set(sel.value);
+    try{localStorage.setItem(KEY,sel.value);}catch(e){}
+  });
+})();
+"""
+
+
+def picker(project, key="codeframe-theme"):
+    """The control the reader uses, and the script that remembers their choice."""
+    themes = project.get("themes") or BUILTIN
+    opts = '<option value="system">Match my system</option>' + "".join(
+        f'<option value="{n}">{(s.get("label") or n)}</option>'
+        for n, s in themes.items())
+    return (f'<div class="themepick"><label for="theme">Theme</label>'
+            f'<select id="theme">{opts}</select></div>'
+            f'<script>{PICKER_JS % json.dumps(key)}</script>')
 
 
 # ------------------------------------------------------------------ the ask
 
-TASK = """You are choosing a colour theme for a set of research pages, to match a
-source the researcher has given you.
+TASK = """You are designing one colour theme for a set of research pages, matched
+to a source the researcher has given you.
 
 Look at the source. If it is an image, read it and take the palette from what is
 actually there. If it is a web page, fetch it and take the palette from its own
-colours. If it is a list of hex values, those ARE the palette - your job is only to
-assign them to roles and fill in the rest around them.
+colours and typography. If it is a list of hex values, those ARE the palette - your
+job is only to assign them to roles and fill in sensibly around them.
 
-Fill both a light and a dark scheme. Dark is not an inversion of light: pick it
-from the same source, restated for a dark surface.
-
-Roles, and what each one is actually for:
+Say whether the result is a light theme or a dark one, then give every token.
 
   ground        the page behind everything
-  surface       a card sitting on the ground
+  surface       a card on the ground
   surface-2     a recess inside a card: an empty bar track, a quote block
-  ink           body text. This has to reach 4.5:1 against ground AND surface
-  ink-2         secondary text: definitions, note bodies. 4.5:1 on surface
+  ink           body text. Must reach 4.5:1 on BOTH ground and surface
+  ink-2         secondary text. 4.5:1 on surface
   ink-3         captions and provenance. 3:1 on surface
   rule          hairline borders
   rule-soft     a fainter rule
-  accent        the filled part of a bar, and the active border. 3:1 on surface-2
+  accent        the filled part of a bar. 3:1 on surface-2
   accent-ink    text on accent-wash. 4.5:1 on accent-wash
   accent-wash   a tinted background behind a tag
-  mark          highlight behind a selected passage
-  mark-ink      text on top of mark
-  warn          destructive actions
-  pos neg       favourable and unfavourable. These carry OPPOSITE meanings and
-                must stay far apart for a red-green colourblind reader - do not
-                make them a plain red and green
+  include       text of an inclusion rule. 4.5:1 on include-wash
+  include-wash  its background
+  exclude       text of an exclusion rule. 4.5:1 on exclude-wash
+  exclude-wash  its background
+  pos neg       favourable and unfavourable. These sit side by side in a stacked
+                bar and mean OPPOSITE things, so they must stay far apart for a
+                red-green colourblind reader. Do not make them red and green -
+                a blue and an orange is the reliable choice
   mixed         both at once
   neutral       no attitude expressed
   none          not judged yet - the most recessive colour in the set
-
-Also choose fonts: a body family and a monospace family, as CSS font stacks with
-sensible fallbacks. Only name a font you are confident is either a common system
-font or available from Google Fonts. If from Google Fonts, give the stylesheet URL.
+  series-a      an extra chart series
+  series-b      another
+  mark          highlight behind a selected passage
+  mark-ink      text on top of mark
+  warn          destructive actions
 
 Reply with JSON only:
 
-{"name": "<a short name for this theme>",
- "fonts": {"body": "<css stack>", "mono": "<css stack>"},
+{"name": "<one lowercase word, no spaces>",
+ "label": "<a short human name for the picker>",
+ "scheme": "<light or dark>",
+ "tokens": {"ground": "#RRGGBB", ...every token above...},
+ "fonts": {"font-display": "<css stack>", "font-body": "<css stack>",
+           "font-mono": "<css stack>"},
  "google_fonts": "<stylesheet url, or omit>",
- "light": {"ground": "#RRGGBB", ...all nineteen roles...},
- "dark":  {...all nineteen roles...},
  "why": "<one sentence on what you took from the source>"}
 
-Every value must be a six-digit hex colour. Contrast is checked after you answer
-and a theme that fails is rejected, so aim clear of the floors rather than at
-them."""
+Every colour must be six-digit hex. Contrast and colourblind separation are
+checked after you answer and a theme that fails is rejected, so aim clear of the
+floors rather than at them."""
 
 
-def from_source(source, model, root):
+def from_source(source, model):
     from review import ask
     kind = ("image" if os.path.splitext(source)[1].lower() in MIME
             else "url" if re.match(r"https?://", source) else "palette")
-    payload = {"source_kind": kind, "roles": TOKENS}
+    payload = {"source_kind": kind, "tokens_required": COLOURS}
     tools = None
     if kind == "image":
         p = os.path.abspath(source)
         if not os.path.exists(p):
             raise SystemExit(f"no such image: {p}")
         payload["image_path"] = p
-        payload["instruction"] = (
-            f"Read the image at {p} with the Read tool and take the palette from it.")
+        payload["instruction"] = f"Read the image at {p} and take the palette from it."
         tools = ["Read"]
     elif kind == "url":
         payload["url"] = source
-        payload["instruction"] = (
-            f"Fetch {source} with WebFetch and take the palette from that page's "
-            "own colours and typography.")
+        payload["instruction"] = (f"Fetch {source} and take the palette and "
+                                  "typography from that page.")
         tools = ["WebFetch"]
     else:
         cols = [c.strip() for c in re.split(r"[,\s]+", source) if c.strip()]
@@ -373,109 +447,129 @@ def from_source(source, model, root):
         if bad:
             raise SystemExit(f"not colours: {', '.join(bad)}")
         payload["palette"] = [to_hex(parse_hex(c)) for c in cols]
-        payload["instruction"] = "Assign these colours to the roles and fill in around them."
+        payload["instruction"] = "Assign these to the roles and fill in around them."
 
     print(f"matching a theme from this {kind}"
-          + (f" using the {tools[0]} tool" if tools else " (no model vision needed)"))
+          + (f", using the {tools[0]} tool to see it" if tools else ""))
     reply, env = ask(payload, model=model, task=TASK, tools=tools, timeout=900)
-    theme = {"name": str(reply.get("name") or "custom")[:40],
-             "fonts": {**DEFAULT_FONTS, **(reply.get("fonts") or {})},
-             "light": reply.get("light") or {}, "dark": reply.get("dark") or {},
-             "source": source, "why": str(reply.get("why", ""))[:200]}
-    if reply.get("google_fonts"):
-        theme["google_fonts"] = reply["google_fonts"]
-    return theme, env.get("total_cost_usd") or 0
+    name = re.sub(r"[^a-z0-9]", "", str(reply.get("name") or "custom").lower())[:20]
+    spec = {"label": str(reply.get("label") or name)[:40],
+            "scheme": "dark" if str(reply.get("scheme")) == "dark" else "light",
+            "shadow": SHADOW["dark" if reply.get("scheme") == "dark" else "light"],
+            "tokens": reply.get("tokens") or {},
+            "source": source, "why": str(reply.get("why", ""))[:200]}
+    return name or "custom", spec, reply, env.get("total_cost_usd") or 0
 
 
 # ------------------------------------------------------------------ cli
 
-def report(theme, verbose=True):
-    bad, notes = validate(theme)
-    if verbose:
-        print(f"theme: {theme.get('name', 'custom')}"
-              + (f"  (from {theme['source']})" if theme.get("source") else ""))
-        if theme.get("why"):
-            print(f"  {theme['why']}")
-        f = {**DEFAULT_FONTS, **(theme.get("fonts") or {})}
-        print(f"  body {f['body'][:52]}")
-        print(f"  mono {f['mono'][:52]}")
-        if theme.get("favicon"):
-            print(f"  favicon from {theme.get('favicon_from', 'a file')}")
-        for mode in ("light", "dark"):
-            cols = theme.get(mode) or {}
-            print(f"  {mode:<6} " + " ".join(
-                f"{t}={cols.get(t, '?')}" for t in ("ground", "surface", "ink", "accent")))
-    for n in notes:
-        print(f"  note: {n}")
-    for b in bad:
-        print(f"  FAIL: {b}")
-    if not bad:
-        print("  contrast and colourblind checks: all pass")
-    return bad
+def show(project):
+    themes = project.get("themes") or {}
+    print(f"default: {project.get('default')}   ({len(themes)} themes ship in every page)")
+    if project.get("favicon"):
+        print(f"favicon: {project.get('favicon_from', 'set')}")
+    f = {**DEFAULT_FONTS, **(project.get("fonts") or {})}
+    for k in FONTS:
+        print(f"  {k:<13} {f[k][:56]}")
+    print()
+    for name, spec in themes.items():
+        bad, _ = validate_one(name, spec)
+        t = spec.get("tokens") or {}
+        mark = "*" if name == project.get("default") else " "
+        print(f"{mark} {name:<11} {spec.get('label', name)[:24]:<26} "
+              f"{spec.get('scheme', 'light'):<6} {t.get('ground', '?')} "
+              f"{t.get('accent', '?')}  {'ok' if not bad else 'FAILS'}")
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Choose how the pages look.")
-    ap.add_argument("--data", required=True, help="project directory")
-    ap.add_argument("--list", action="store_true", help="show the built-in themes")
-    ap.add_argument("--set", metavar="NAME", help="use a built-in theme")
+    ap = argparse.ArgumentParser(description="Themes the pages ship with.")
+    ap.add_argument("--data", required=True)
+    ap.add_argument("--list", action="store_true")
+    ap.add_argument("--default", metavar="NAME", help="which theme opens first")
     ap.add_argument("--from", dest="src", metavar="SOURCE",
-                    help="match an image file, a URL, or a list of hex colours")
-    ap.add_argument("--favicon", metavar="FILE", help="use this file as the favicon")
+                    help="add a theme from an image, a URL, or hex colours")
+    ap.add_argument("--name", help="with --from: what to call it")
+    ap.add_argument("--drop", metavar="NAME", help="remove a theme")
+    ap.add_argument("--reset", action="store_true", help="back to the four built-ins")
+    ap.add_argument("--favicon", metavar="FILE")
     ap.add_argument("--model", default=None)
     ap.add_argument("--force", action="store_true",
-                    help="write a theme even if it fails the readability checks")
+                    help="write even if a readability check fails")
     a = ap.parse_args()
     root = os.path.abspath(a.data)
     if not os.path.isdir(root):
         raise SystemExit(f"no such project: {root}")
 
-    if a.list:
-        for name, t in BUILTIN.items():
-            bad, _ = validate(t)
-            print(f"  {name:<10} {t['light']['accent']} / {t['dark']['accent']}"
-                  f"   {'ok' if not bad else 'FAILS: ' + bad[0][:60]}")
-        print("\n  python theme.py --data <p> --set <name>")
-        return
+    project = blank() if a.reset else load(root)
+    changed, cost = a.reset, 0
 
-    theme, cost = None, 0
-    if a.set:
-        if a.set not in BUILTIN:
-            raise SystemExit(f"unknown theme {a.set!r} - try --list")
-        theme = json.loads(json.dumps(BUILTIN[a.set]))
-    elif a.src:
+    if a.src:
         from model import current
-        theme, cost = from_source(a.src, a.model or current(), root)
+        name, spec, reply, cost = from_source(a.src, a.model or current())
+        name = re.sub(r"[^a-z0-9]", "", (a.name or name).lower()) or "custom"
+        bad, notes = validate_one(name, spec)
+        for n in notes:
+            print(f"  note: {n}")
+        for b in bad:
+            print(f"  FAIL: {b}")
+        if bad and not a.force:
+            raise SystemExit(
+                f"\nnot added - {len(bad)} readability check(s) failed.\n"
+                "  Try another source, or --force if you know better than the maths.")
+        project["themes"][name] = spec
+        if reply.get("fonts"):
+            project["fonts"] = {**DEFAULT_FONTS, **reply["fonts"]}
+        if reply.get("google_fonts"):
+            project["google_fonts"] = reply["google_fonts"]
+        project["default"] = name
+        changed = True
+        print(f"\nadded theme {name!r} ({spec['label']}) and made it the default")
+        if spec.get("why"):
+            print(f"  {spec['why']}")
 
-    if theme is None:                       # no change asked for: show and check
-        theme = load(root)
-        report(theme)
-        if a.favicon:
-            n = set_favicon(theme, a.favicon)
-            save(root, theme)
-            print(f"\nfavicon set from {a.favicon} ({n//1024 or 1}KB, inlined)")
-        return
+    if a.drop:
+        if a.drop not in project.get("themes", {}):
+            raise SystemExit(f"no theme called {a.drop!r}")
+        if len(project["themes"]) == 1:
+            raise SystemExit("that is the only theme left")
+        del project["themes"][a.drop]
+        if project.get("default") == a.drop:
+            project["default"] = next(iter(project["themes"]))
+        changed = True
+        print(f"dropped {a.drop!r}")
 
-    # carry the existing favicon forward unless a new one is given
-    old = load(root)
-    if old.get("favicon") and not a.favicon:
-        theme["favicon"] = old["favicon"]
-        theme["favicon_from"] = old.get("favicon_from", "")
+    if a.default:
+        if a.default not in project.get("themes", {}):
+            raise SystemExit(f"no theme called {a.default!r} - try --list")
+        project["default"] = a.default
+        changed = True
+
     if a.favicon:
-        set_favicon(theme, a.favicon)
+        n = set_favicon(project, a.favicon)
+        changed = True
+        print(f"favicon set from {a.favicon} ({n // 1024 or 1}KB, inlined)")
 
-    print()
-    bad = report(theme)
+    if a.list or not changed:
+        show(project)
+        bad, notes = validate(project)
+        for n in notes:
+            print(f"  note: {n}")
+        for b in bad:
+            print(f"  FAIL: {b}")
+        if not bad:
+            print("\n  every theme passes contrast and colourblind checks")
+        if not changed:
+            return
+
+    bad, _ = validate(project)
+    if bad and not a.force:
+        raise SystemExit(f"\nnot written - {len(bad)} check(s) failed. "
+                         "Fix them, or pass --force.")
+    p = save(root, project)
     if cost:
         print(f"  cost: ${cost:.2f}")
-    if bad and not a.force:
-        raise SystemExit(
-            f"\nnot written - {len(bad)} readability check(s) failed.\n"
-            "  A theme that fails these is one somebody cannot read. Try another\n"
-            "  source, or pass --force if you know better than the arithmetic.")
-    p = save(root, theme)
     print(f"\nwrote {p}")
-    print("  rebuild the pages to see it:  python findings.py --data <p> --generate")
+    print("  rebuild to see it:  python findings.py --data <p> --generate")
 
 
 if __name__ == "__main__":

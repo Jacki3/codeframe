@@ -65,48 +65,49 @@ PAGE = r"""<!doctype html>
 __THEME_HEAD__
 <style>
 __THEME_VARS__
+__PICKER_CSS__
 *{box-sizing:border-box}
-body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--body)}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--font-body)}
 .wrap{display:grid;grid-template-columns:290px 1fr;gap:28px;max-width:1560px;margin:0 auto;padding:18px 22px 90px}
 .rail{position:sticky;top:18px;align-self:start;display:grid;gap:13px;max-height:calc(100vh - 36px);overflow:auto;padding-right:4px}
 h1{font-size:17px;margin:0}
-.sub{margin:2px 0 0;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);line-height:1.5;word-break:break-all}
-label.f{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 5px}
-input,select,textarea{width:100%;padding:7px 9px;font:14px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:3px}
+.sub{margin:2px 0 0;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);line-height:1.5;word-break:break-all}
+label.f{display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:0 0 5px}
+input,select,textarea{width:100%;padding:7px 9px;font:14px var(--font-body);color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:3px}
 textarea{resize:vertical;min-height:56px}
-button{font:14px var(--body);padding:7px 13px;border-radius:3px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);cursor:pointer}
+button{font:14px var(--font-body);padding:7px 13px;border-radius:3px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);cursor:pointer}
 button:hover{border-color:var(--accent)}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 button.small{font-size:12.5px;padding:4px 9px}
 button.danger{color:var(--warn)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.tally{font-family:var(--mono);font-size:12px;color:var(--ink-3);border-top:1px solid var(--rule);padding-top:11px;margin:0}
-.msg{font-family:var(--mono);font-size:11.5px;color:var(--accent-ink);margin:0;min-height:1em}
+.tally{font-family:var(--font-mono);font-size:12px;color:var(--ink-3);border-top:1px solid var(--rule);padding-top:11px;margin:0}
+.msg{font-family:var(--font-mono);font-size:11.5px;color:var(--accent-ink);margin:0;min-height:1em}
 .msg.err{color:var(--warn)}
 /* codebook in the rail */
 .cb{display:grid;gap:2px;max-height:300px;overflow:auto}
 .cbrow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:baseline;padding:3px 5px;border-radius:2px;cursor:pointer}
 .cbrow:hover{background:var(--surface-2)}
-.cbrow b{font-family:var(--mono);font-size:11px;color:var(--accent-ink);font-weight:600}
+.cbrow b{font-family:var(--font-mono);font-size:11px;color:var(--accent-ink);font-weight:600}
 .cbrow em{font-style:normal;color:var(--ink-2);font-size:12.5px}
-.cbrow span{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+.cbrow span{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3)}
 .cbempty{color:var(--ink-3);font-size:13px;font-style:italic}
 /* source list */
 .src{background:var(--surface);border:1px solid var(--rule);border-left:3px solid transparent;
   border-radius:3px;padding:12px 15px;margin-bottom:7px;cursor:pointer}
 .src:hover{border-color:var(--accent)}
 .src.has{border-left-color:var(--accent)}
-.src .hdr{display:flex;flex-wrap:wrap;gap:4px 11px;font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+.src .hdr{display:flex;flex-wrap:wrap;gap:4px 11px;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3)}
 .src .hdr .pid{color:var(--ink-2);font-weight:600}
 .src p{margin:6px 0 0;color:var(--ink-2);font-size:14px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* document view */
 .doc{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:22px 26px}
-.doc .hdr{display:flex;flex-wrap:wrap;gap:5px 13px;font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-bottom:14px}
+.doc .hdr{display:flex;flex-wrap:wrap;gap:5px 13px;font-family:var(--font-mono);font-size:11px;color:var(--ink-3);margin-bottom:14px}
 .body{white-space:pre-wrap;font-size:16.5px;line-height:1.75;-webkit-user-select:text;user-select:text}
 .body mark{background:var(--mark);color:var(--mark-ink);padding:1px 0;cursor:pointer;border-radius:2px}
 .body mark:hover{outline:1px solid var(--accent)}
-.hint{color:var(--ink-3);font-size:13px;margin:0 0 14px;font-family:var(--mono)}
+.hint{color:var(--ink-3);font-size:13px;margin:0 0 14px;font-family:var(--font-mono)}
 /* coding panel */
 .panel{position:fixed;right:22px;bottom:22px;width:390px;max-height:78vh;overflow:auto;
   background:var(--surface);border:1px solid var(--accent);border-radius:4px;
@@ -120,13 +121,13 @@ button.danger{color:var(--warn)}
 .crow:hover{background:var(--surface-2)}
 .crow.on{background:var(--accent-wash)}
 .crow .nm{font-size:13px;line-height:1.3}
-.crow .nm b{font-family:var(--mono);font-size:10.5px;color:var(--accent-ink)}
+.crow .nm b{font-family:var(--font-mono);font-size:10.5px;color:var(--accent-ink)}
 .crow .nm span{color:var(--ink-3);font-size:12px}
 .crow select{width:auto;padding:1px 4px;font-size:11.5px;visibility:hidden}
 .crow.on select{visibility:visible}
-.lensgrp{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:7px 0 3px}
+.lensgrp{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin:7px 0 3px}
 .lensgrp:first-child{margin-top:0}
-.empty{color:var(--ink-3);font-family:var(--mono);font-size:13px;padding:26px 0}
+.empty{color:var(--ink-3);font-family:var(--font-mono);font-size:13px;padding:26px 0}
 dialog{border:1px solid var(--rule);border-radius:4px;background:var(--surface);color:var(--ink);max-width:620px;width:92%;padding:22px}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 dialog h2{margin:0 0 14px;font-size:17px}
@@ -136,7 +137,7 @@ dialog h2{margin:0 0 14px;font-size:17px}
 </style></head><body>
 <div class="wrap">
 <aside class="rail">
-  <div><h1>Coding tool</h1><p class="sub" id="meta"></p></div>
+  <div><h1>Coding tool</h1><p class="sub" id="meta"></p>__PICKER__</div>
   <div><label class="f" for="q">Search sources</label><input id="q" type="search" placeholder="word or phrase"></div>
   <div><label class="f" for="pid">Participant</label><select id="pid"></select></div>
   <div><label class="f" for="game" id="unitlab">Unit</label><select id="game"></select></div>
@@ -451,6 +452,8 @@ def make_handler(proj, read_only):
     import theme as _theme
     _t = _theme.load(proj.root)
     page = (PAGE.replace("__THEME_VARS__", _theme.css_vars(_t))
+                .replace("__PICKER_CSS__", _theme.PICKER_CSS)
+                .replace("__PICKER__", _theme.picker(_t))
                 .replace("__THEME_HEAD__", _theme.head_extra(_t))).encode("utf-8")
 
     class H(BaseHTTPRequestHandler):
