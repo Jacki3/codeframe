@@ -260,6 +260,51 @@ source_id, pid, unit, kind, label, text
 plus a `frame.csv` keyed on `pid, unit`. Only `source_id`, `pid`, `unit` and
 `text` are required.
 
+## How the pages look
+
+```
+python theme.py --data ../myproject --list
+python theme.py --data ../myproject --set paper
+python theme.py --data ../myproject --from palette.png
+python theme.py --data ../myproject --from https://example.org
+python theme.py --data ../myproject --from "#173C2E,#E8E4D9,#C2703D"
+python theme.py --data ../myproject --favicon logo.png
+```
+
+The theme lives in `<project>/theme.json` and is read by all four surfaces — the
+findings, codebook and discussion pages, and the coding tool — so they move
+together. Built-in themes: `default`, `paper`, `slate`.
+
+`--from` matches something. A list of hex colours needs no vision: the colours are
+already the answer and the work is assigning them to roles. **An image or a URL is
+why this goes through a model at all** — it has to see the thing, so the CLI is
+granted `Read` for a file or `WebFetch` for a page, one tool, only for that call.
+Fonts come back too, as CSS stacks; a Google Fonts stylesheet is linked if one is
+named.
+
+`--favicon` inlines the file as a data URI, so a page stays a single file with no
+assets beside it.
+
+**Readability is computed, not taken on trust.** Before a theme is written:
+
+| check | floor |
+|---|---|
+| body text on ground, and on a card | 4.5:1 |
+| secondary ink on a card | 4.5:1 |
+| muted ink, accent marks, valence marks | 3:1 |
+| `pos` against `neg` under deuteranopia | ΔE 8 |
+
+A theme that fails is reported and not written unless you pass `--force`. This
+caught the three built-in themes when they were first written — a green/red
+`pos`/`neg` pair sits about 4–7 ΔE apart for a red-green colourblind reader, which
+means reading the opposite finding. They are blue and orange now, around 20–25.
+
+One thing colour cannot fix: deuteranopia collapses hue onto roughly one
+blue–yellow axis, so once `pos` and `neg` hold the two poles there is **no third
+hue left** for `mixed` — every candidate lands on top of one of them. It carries a
+diagonal stripe as well as a colour, and the legend and its fixed position in the
+stack do the rest. The checker says so rather than pretending otherwise.
+
 ## If you have no Claude account
 
 Most of this does not need one. Only four steps ask a model:

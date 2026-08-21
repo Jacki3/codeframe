@@ -62,27 +62,9 @@ PAGE = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Coding tool</title>
+__THEME_HEAD__
 <style>
-:root{
-  color-scheme:light;
-  --ground:#F2F2EF; --surface:#FFF; --surface-2:#F8F8F5;
-  --ink:#22212A; --ink-2:#56545F; --ink-3:#86848F;
-  --rule:#E0DFDA; --rule-soft:#EBEAE6;
-  --accent:#6B7233; --accent-ink:#4E541F; --accent-wash:#EDEFE0;
-  --mark:#EDE8B8; --mark-ink:#3F3A12;
-  --pos:#1F6FB8; --neg:#C0731F; --warn:#8A4B42;
-  --mono:Consolas,"Cascadia Mono","SF Mono",Menlo,monospace;
-  --body:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif;
-}
-@media (prefers-color-scheme:dark){:root{
-  color-scheme:dark;
-  --ground:#17171B; --surface:#1F1F25; --surface-2:#25252C;
-  --ink:#EDECEE; --ink-2:#A9A7B2; --ink-3:#75737E;
-  --rule:#31313A; --rule-soft:#292930;
-  --accent:#A8B45C; --accent-ink:#C3CE84; --accent-wash:#2A2D1E;
-  --mark:#4A431C; --mark-ink:#F0E9BE;
-  --pos:#4E93CE; --neg:#BC8437; --warn:#CC9186;
-}}
+__THEME_VARS__
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--body)}
 .wrap{display:grid;grid-template-columns:290px 1fr;gap:28px;max-width:1560px;margin:0 auto;padding:18px 22px 90px}
@@ -466,7 +448,10 @@ document.addEventListener('keydown',e=>{
 
 
 def make_handler(proj, read_only):
-    page = PAGE.encode("utf-8")
+    import theme as _theme
+    _t = _theme.load(proj.root)
+    page = (PAGE.replace("__THEME_VARS__", _theme.css_vars(_t))
+                .replace("__THEME_HEAD__", _theme.head_extra(_t))).encode("utf-8")
 
     class H(BaseHTTPRequestHandler):
         def _send(self, data, ctype="application/json; charset=utf-8", code=200):

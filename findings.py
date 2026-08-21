@@ -28,6 +28,8 @@ the figures say so where it matters.
 """
 import argparse, collections, csv, json, os, re, statistics, sys
 
+import theme
+
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
@@ -35,6 +37,7 @@ except (AttributeError, ValueError):
     pass
 
 csv.field_size_limit(10 ** 8)
+TH = theme.BUILTIN["default"]   # replaced by load()
 KINDS = ("prevalence", "valence", "split", "measures", "dependence",
          "cooccur")
 VALENCE_ORDER = ("pos", "mixed", "neutral", "neg", "")
@@ -52,7 +55,9 @@ def _read(path):
 
 
 def load(root):
+    global TH
     root = os.path.abspath(root)
+    TH = theme.load(root)
     frame = _read(os.path.join(root, "frame.csv"))
     for r in frame:                        # unit and game are the same column
         r.setdefault("unit", r.get("game", ""))
@@ -305,18 +310,7 @@ def default_specs(D):
 
 # ------------------------------------------------------------------ styling
 
-CSS = """
-:root{color-scheme:light;
- --ground:#F2F2EF;--surface:#FFF;--surface-2:#F8F8F5;--ink:#22212A;--ink-2:#56545F;
- --ink-3:#86848F;--rule:#E0DFDA;--accent:#6B7233;--accent-ink:#4E541F;
- --accent-wash:#EDEFE0;--pos:#3E7F4E;--neg:#B4593C;--mixed:#B08A2E;--neutral:#7A7885;
- --none:#C9C7C0;--mono:Consolas,"Cascadia Mono","SF Mono",Menlo,monospace;
- --body:"Segoe UI",-apple-system,BlinkMacSystemFont,Arial,sans-serif}
-@media (prefers-color-scheme:dark){:root{color-scheme:dark;
- --ground:#17171B;--surface:#1F1F25;--surface-2:#25252C;--ink:#EDECEE;--ink-2:#A9A7B2;
- --ink-3:#75737E;--rule:#31313A;--accent:#A8B45C;--accent-ink:#C3CE84;
- --accent-wash:#2A2D1E;--pos:#6FAE7E;--neg:#D18A6E;--mixed:#D6B45F;--neutral:#9997A3;
- --none:#42414A}}
+CSS_RULES = """
 *{box-sizing:border-box}
 body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--body)}
 .wrap{max-width:980px;margin:0 auto;padding:34px 24px 100px}
@@ -338,7 +332,8 @@ figcaption{color:var(--ink-3);font-size:12.5px;margin-top:13px;line-height:1.6}
 .num{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);text-align:right}
 .stack{display:flex;height:17px;border-radius:2px;overflow:hidden;background:var(--surface-2)}
 .stack i{display:block;height:100%}
-.pos{background:var(--pos)}.neg{background:var(--neg)}.mixed{background:var(--mixed)}
+.pos{background:var(--pos)}
+.stack i.mixed{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.30) 0 2px,transparent 2px 5px)}.neg{background:var(--neg)}.mixed{background:var(--mixed)}
 .neutral{background:var(--neutral)}.none{background:var(--none)}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;font-size:13px;min-width:420px}
@@ -493,7 +488,9 @@ def page(D, specs, results, title="Findings"):
     touched = len({k for cid in D["plays"] for k in D["plays"][cid]})
     H = [f'<!doctype html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width,initial-scale=1">',
-         f'<title>{esc(title)}</title><style>{CSS}</style></head><body><div class="wrap">',
+         f'<title>{esc(title)}</title>{theme.head_extra(TH)}'
+         f'<style>{theme.css_vars(TH)}{CSS_RULES}</style>'
+         '</head><body><div class="wrap">',
          f'<h1>{esc(title)}</h1>',
          f'<p class="sub">{len(D["keys"])} {D["units"]} &middot; '
          f'{len({r["pid"] for r in D["frame"]})} participants &middot; '
@@ -626,7 +623,9 @@ def codebook_page(D):
 
     H = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width,initial-scale=1">',
-         f'<title>Codebook</title><style>{CSS}</style></head><body><div class="wrap">',
+         f'<title>Codebook</title>{theme.head_extra(TH)}'
+         f'<style>{theme.css_vars(TH)}{CSS_RULES}</style>'
+         '</head><body><div class="wrap">',
          '<h1>Codebook</h1>',
          f'<p class="sub">{len(D["codes"])} codes in {len(by_lens)} lenses &middot; '
          f'prevalence is the share of {n} {D["units"]} carrying the code</p>',
@@ -753,7 +752,9 @@ def discussion_page(D, notes, summaries, standing=()):
     total = sum(len(v) for v in notes.values())
     H = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
          '<meta name="viewport" content="width=device-width,initial-scale=1">',
-         f'<title>Discussion</title><style>{CSS}</style></head><body><div class="wrap">',
+         f'<title>Discussion</title>{theme.head_extra(TH)}'
+         f'<style>{theme.css_vars(TH)}{CSS_RULES}</style>'
+         '</head><body><div class="wrap">',
          '<h1>Discussion</h1>',
          f'<p class="sub">'
          + (f'{len(standing)} notes about the study &middot; ' if standing else '')

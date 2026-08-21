@@ -235,7 +235,7 @@ def explain(env):
     return f"the claude CLI reported a problem:\n    {msg[:400]}\n" + OFFLINE_NOTE
 
 
-def ask(payload, model=None, timeout=600, task=None):
+def ask(payload, model=None, timeout=600, task=None, tools=None):
     from model import current
     model = model or current()
     exe = shutil.which("claude")
@@ -245,8 +245,14 @@ def ask(payload, model=None, timeout=600, task=None):
             "    install it from claude.com/product/claude-code,\n"
             "    then run  claude auth login\n" + OFFLINE_NOTE)
     prompt = (task or TASK) + "\n\nINPUT\n" + json.dumps(payload, indent=1)
+    # Tools are granted one at a time and only where the job needs them: matching
+    # a theme to an image means the model has to see the image, and there is no
+    # way to do that without letting it read the file.
+    cmd = [exe, "-p", "--output-format", "json", "--model", model]
+    if tools:
+        cmd += ["--allowedTools", ",".join(tools)]
     p = subprocess.run(
-        [exe, "-p", "--output-format", "json", "--model", model],
+        cmd,
         input=prompt, capture_output=True, text=True, timeout=timeout,
         encoding="utf-8", errors="replace")
 
