@@ -165,6 +165,7 @@ dialog h2{margin:0 0 14px;font-size:17px}
     <option value="">all</option><option value="pos">pos</option><option value="neg">neg</option>
     <option value="mixed">mixed</option><option value="neutral">neutral</option>
     <option value="unjudged">not judged yet</option></select></div>
+  <div><label class="f" for="lens">Lens</label><select id="lens"></select></div>
   <div id="facets"></div>
   <div><label class="f">Codebook <span id="ccount" style="text-transform:none;letter-spacing:0"></span></label>
     <div class="cb" id="cb"></div>
@@ -240,6 +241,11 @@ function boot(d){
   $('facets').querySelectorAll('select').forEach(el=>
     el.addEventListener('change',()=>{ if(!openDoc) showList(); }));
   $('lenslist').innerHTML=d.lenses.map(l=>`<option>${esc(l)}</option>`).join('');
+  // The lens is how the discussion page groups everything, so it needs to be
+  // steerable while coding, not only visible afterwards.
+  $('lens').innerHTML='<option value="">all lenses</option>'
+    +d.lenses.map(l=>`<option>${esc(l)}</option>`).join('')
+    +(d.codes.some(c=>!c.lens)?'<option value="__none__">(no lens set)</option>':'');
   drawCodebook();
   openDoc?showDoc(openDoc):showList();
 }
@@ -247,16 +253,25 @@ function boot(d){
 function drawCodebook(){
   const cs=D.codes;
   $('ccount').textContent=cs.length?`(${cs.length})`:'';
-  $('cb').innerHTML=cs.length? cs.map(c=>
-    `<div class="cbrow" title="${esc(c.definition||'')}" data-code="${esc(c.id)}">
-       <span><b>${esc(c.id)}</b><br><em>${esc(c.name)}</em></span>
-       <span>${c.plays?c.pct+'%':'—'}</span></div>`).join('')
-    : '<p class="cbempty">Empty. Codes appear here as you define them.</p>';
+  if(!cs.length){
+    $('cb').innerHTML='<p class="cbempty">Empty. Codes appear here as you define them.</p>';
+    return;
+  }
+  // Grouped by lens, because that is the structure the discussion page reports
+  // in - seeing it while coding is what stops a lens quietly filling up.
+  const by={};
+  cs.forEach(c=>{const L=c.lens||'(no lens set)';(by[L]=by[L]||[]).push(c);});
+  $('cb').innerHTML=Object.keys(by).sort().map(L=>
+    `<div class="lensgrp">${esc(L)}</div>`+by[L].map(c=>
+      `<div class="cbrow" title="${esc(c.definition||'')}" data-code="${esc(c.id)}">
+         <span><b>${esc(c.id)}</b><br><em>${esc(c.name)}</em></span>
+         <span>${c.plays?c.pct+'%':'—'}</span></div>`).join('')).join('');
 }
 
 function filtered(){
   const q=$('q').value.trim().toLowerCase(),game=$('game').value,pid=$('pid').value,
         kind=$('kind').value,status=$('status').value,val=$('valence').value,
+        lens=$('lens').value,
         fs=[...document.querySelectorAll('#facets select')]
              .map(e=>[e.dataset.facet,e.value]).filter(([,v])=>v);
   // Valence sits on a coding, not on a document, so this asks whether the
@@ -264,12 +279,16 @@ function filtered(){
   // match a blank rather than a value.
   const hasVal=s=>(D.excerpts[s.source_id]||[]).some(x=>x.codes.some(
     c=>val==='unjudged'?!c[1]:c[1]===val));
+  // " " is the sentinel for codes with no lens at all - the ones that would
+  // land in "Uncategorised" on the discussion page.
+  const hasLens=s=>(D.excerpts[s.source_id]||[]).some(x=>x.codes.some(
+    c=>{const L=(CODES[c[0]]||{}).lens||''; return lens==='__none__'?!L:L===lens;}));
   return D.sources.filter(s=>{
     const n=(D.excerpts[s.source_id]||[]).length;
     return (!q||s.text.toLowerCase().includes(q))&&(!game||s.game===game)
       &&(!pid||s.pid===pid)
       &&(!kind||s.kind===kind)&&(!status||(status==='has')===(n>0))
-      &&(!val||hasVal(s))
+      &&(!val||hasVal(s))&&(!lens||hasLens(s))
       &&fs.every(([f,v])=>s[f]===v);
   });
 }
@@ -420,7 +439,7 @@ document.addEventListener('click',e=>{
   const cb=e.target.closest('.cbrow');
   if(cb&&!openDoc){ $('q').value=''; flash(CODES[cb.dataset.code].definition||cb.dataset.code); }
 });
-['q','pid','game','kind','status','valence'].forEach(id=>
+['q','pid','game','kind','status','valence','lens'].forEach(id=>
   $(id).addEventListener(id==='q'?'input':'change',()=>{ if(!openDoc) showList(); }));
 
 $('newcode').addEventListener('click',()=>{$('n_err').textContent='';$('dlgCode').showModal();});

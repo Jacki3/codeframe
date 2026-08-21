@@ -33,7 +33,7 @@ MATCHING
     at, with the closest candidate and a similarity score so you can see what
     went wrong. Nothing ambiguous is ever filed silently.
 """
-import argparse, csv, difflib, io, os, re, sys, unicodedata, json
+import argparse, collections, csv, difflib, io, os, re, sys, unicodedata, json
 
 # Quotes carry curly apostrophes and dashes; a cp1252 console mangles them on the
 # way to the screen even though the files are fine.
@@ -135,6 +135,16 @@ def read_sheet(path):
             raise SystemExit(
                 f"{path} needs a '{req}' column. Found: {', '.join(rows[0].keys())}")
     return rows, found, unknown
+
+
+def lens_for(cid, codes):
+    """The lens the other codes sharing this id's prefix use, if they agree enough."""
+    prefix = str(cid).split("-")[0].upper()
+    seen = collections.Counter(
+        (c.get("lens") or "").strip() for c in codes
+        if str(c.get("code_id", "")).split("-")[0].upper() == prefix
+        and (c.get("lens") or "").strip())
+    return seen.most_common(1)[0][0] if seen else ""
 
 
 def main():
@@ -320,16 +330,33 @@ def main():
             "closest_source": p[3], "similarity": p[4]} for p in problems])
 
     if new_codes and a.allow_new_codes:
-        fields = list(codes[0].keys()) if codes else \
-            ["code_id", "lens", "name", "definition", "include", "exclude", "note"]
+        from project import CODE_FIELDS
+        fields = list(codes[0].keys()) if codes else list(CODE_FIELDS)
         for cid in sorted(new_codes):
             stub = {k: "" for k in fields}
             stub["code_id"] = cid
             stub["name"] = cid.replace("-", " ").title()
+            # A code id is conventionally PREFIX-SOMETHING, and the prefix is
+            # almost always the lens. Inheriting it means a stub does not land in
+            # "Uncategorised" on the discussion page, which is where a lens-less
+            # code goes to be forgotten.
+            stub["lens"] = lens_for(cid, codes)
             stub["note"] = "stub created by file_codings.py - needs a definition"
             codes.append(stub)
         write(codes_path, fields, codes)
-        print(f"\nadded {len(new_codes)} code stub(s) to codebook/codes.csv - they need definitions")
+        print(f"\nadded {len(new_codes)} code stub(s) to codebook/codes.csv - "
+              f"they need definitions")
+        guessed = [c for c in codes if c["code_id"] in new_codes and c.get("lens")]
+        if guessed:
+            print(f"  lens guessed from the id prefix for {len(guessed)}: "
+                  + ", ".join(f"{c['code_id']} -> {c['lens']}" for c in guessed[:4]))
+
+    # A code with no lens is invisible to the discussion page, which groups by it.
+    no_lens = sorted(c["code_id"] for c in codes if not (c.get("lens") or "").strip())
+    if no_lens:
+        print(f"\n{len(no_lens)} code(s) have no lens and will group under "
+              f"\"Uncategorised\" in the discussion:")
+        print("  " + ", ".join(no_lens[:8]) + (" ..." if len(no_lens) > 8 else ""))
 
     print(f"\nwrote data/excerpts.csv, data/codings.csv, data/unresolved.csv")
 

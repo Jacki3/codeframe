@@ -118,6 +118,13 @@ Codes live in `codebook/codes.csv`, which you write as you go: an id, a lens, a
 name, the include and exclude rules, and optionally a valence the code carries by
 its nature.
 
+**The lens is structural, not decoration.** It is what the discussion page groups
+by, and what the coding rail filters and groups the codebook by, so a code with no
+lens is one you will not see coming. Conventionally a code id is `PREFIX-SOMETHING`
+and the prefix is the lens — `PLC-ANCHOR` under Place, `ENJ-EXPLORE` under
+Enjoyment. A stub created by `--allow-new-codes` inherits the lens its prefix-mates
+use, and `file_codings.py` lists any code still without one.
+
 **Settle any valence you left blank:**
 
 ```
