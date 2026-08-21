@@ -260,6 +260,33 @@ source_id, pid, unit, kind, label, text
 plus a `frame.csv` keyed on `pid, unit`. Only `source_id`, `pid`, `unit` and
 `text` are required.
 
+## What the site calls itself
+
+```
+python siteinfo.py --data ../myproject --init
+python siteinfo.py --data ../myproject --title "Qualitative codebook" --version v0.4
+```
+
+Read from `<project>/site.json`. Nothing is required — with no file at all the
+title is the project folder's own name, which is right often enough to be a
+sensible default and wrong in a way that is obvious the moment you look.
+
+| | |
+|---|---|
+| `title` | the h1 |
+| `version` | beside it, greyed |
+| `project` | the eyebrow above it — the study or programme this belongs to |
+| `description` | the standfirst under it |
+| `authors` | shown in the footer |
+| `footer` | a licence, a DOI, a date — whatever else belongs at the bottom |
+
+Every page opens with that masthead, then the headline figures, then the nav.
+The codebook and discussion pages carry a **search box** (press `/`, Escape
+clears) and **filter-by-lens chips** with counts; matching happens in the page,
+with no reload and no server, and a lens heading with nothing left under it hides
+itself. Everything is searchable, including the method notes — searching
+*weather* on the discussion page finds the note about the cold.
+
 ## How the pages look
 
 A project ships **several themes, not one**. Every page carries all of them plus a

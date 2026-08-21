@@ -28,6 +28,7 @@ the figures say so where it matters.
 """
 import argparse, collections, csv, json, os, re, statistics, sys
 
+import siteinfo
 import theme
 
 try:
@@ -87,7 +88,9 @@ def load(root):
         (plays[c["code_id"]] if k in keys else loose[c["code_id"]]).add(
             k if k in keys else x["pid"])
     unit = meta.get("unit_label") or "unit"
+    site = siteinfo.load(root)
     return {"root": root, "frame": frame, "keys": keys, "meta": meta,
+            "site": site,
             "unit": unit, "units": unit + ("s" if not unit.endswith("s") else ""),
             "kinds": meta.get("kinds") or sorted(
                 {x.get("kind", "") for x in excerpts.values() if x.get("kind")}),
@@ -312,6 +315,29 @@ def default_specs(D):
 
 CSS_RULES = """
 *{box-sizing:border-box}
+.masthead{margin-bottom:6px}
+.eyebrow{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.11em;
+ text-transform:uppercase;color:var(--accent-ink);margin:0 0 6px}
+.standfirst{font-size:17px;line-height:1.65;color:var(--ink-2);max-width:62ch;margin:14px 0 0}
+.toolbar{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;
+ background:var(--surface);border:var(--border) solid var(--rule);
+ border-radius:var(--radius);padding:13px 16px;margin:0 0 6px;box-shadow:var(--shadow)}
+.field{display:flex;flex-direction:column;gap:5px;min-width:230px;flex:1}
+.field label{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;
+ text-transform:uppercase;color:var(--ink-3)}
+.field input{font:14px var(--font-body);color:var(--ink);background:var(--surface-2);
+ border:var(--border) solid var(--rule);border-radius:var(--radius-sm);padding:7px 10px;width:100%}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:12.5px var(--font-body);color:var(--ink-2);background:var(--surface-2);
+ border:var(--border) solid var(--rule);border-radius:100px;padding:4px 11px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent-wash);color:var(--accent-ink);
+ border-color:var(--accent)}
+.chip b{font-family:var(--font-mono);font-size:10.5px;opacity:.7;font-weight:400}
+.tally{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);margin:9px 0 0;min-height:1em}
+[hidden]{display:none !important}
+footer{margin-top:44px;padding-top:16px;border-top:var(--border) solid var(--rule);
+ font-family:var(--font-mono);font-size:11px;color:var(--ink-3)}
 .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;
  flex-wrap:wrap;margin-bottom:8px}
 .figures{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 26px}
@@ -390,13 +416,94 @@ def figures(D):
             + '</div>')
 
 
-def header(title, sub):
-    return (f'<div class="topbar"><div><h1>{esc(title)}</h1>'
-            f'<p class="sub">{sub}</p></div>{theme.picker(TH)}</div>')
+def masthead(D, page, sub):
+    """The block every page opens with: whose study this is, and what page you are on.
+
+    The page's own name is secondary to the project's: a reader arriving at a
+    findings page needs to know what study it belongs to before they need to know
+    it is the findings.
+    """
+    m = D["site"]
+    ver = (f' <span style="color:var(--ink-3);font-weight:400">{esc(m["version"])}'
+           f'</span>' if m.get("version") else "")
+    eyebrow = (f'<p class="eyebrow">{esc(m["project"])}</p>'
+               if m.get("project") else "")
+    stand = (f'<p class="standfirst">{esc(m["description"])}</p>'
+             if m.get("description") else "")
+    return (f'<header class="masthead">{eyebrow}'
+            f'<div class="topbar"><div><h1>{esc(m["title"])}{ver}</h1>'
+            f'<p class="sub">{esc(page)} &middot; {sub}</p></div>'
+            f'{theme.picker(TH)}</div>{stand}{figures(D)}</header>')
+
+
+def footer(D):
+    m = D["site"]
+    bits = []
+    if m.get("authors"):
+        bits.append(esc(", ".join(m["authors"])))
+    if m.get("footer"):
+        bits.append(esc(m["footer"]))
+    bits.append(f'{len(D["codings"])} codings over {len(D["keys"])} {D["units"]}')
+    return '<footer>' + " &middot; ".join(bits) + '</footer>'
+
+
+def filter_bar(lenses, placeholder):
+    """Search and lens chips. Filters cards in the page; no reload, no server."""
+    chips = "".join(
+        f'<button class="chip" type="button" aria-pressed="false" '
+        f'data-lens="{esc(l)}">{esc(l)} <b>{n}</b></button>' for l, n in lenses)
+    return (f'<div class="toolbar">'
+            f'<div class="field"><label for="q">Search '
+            f'<span style="text-transform:none;letter-spacing:0">(press /)</span>'
+            f'</label><input id="q" type="search" autocomplete="off" '
+            f'placeholder="{esc(placeholder)}"></div>'
+            + (f'<div class="field"><label>Filter by lens</label>'
+               f'<div class="filters">{chips}</div></div>' if chips else "")
+            + f'</div><p class="tally" id="tally"></p>')
+
+
+FILTER_JS = """
+(function(){
+  var q=document.getElementById('q'), cards=[].slice.call(
+        document.querySelectorAll('[data-search]')),
+      chips=[].slice.call(document.querySelectorAll('.chip')),
+      tally=document.getElementById('tally'), lens=null;
+  if(!cards.length) return;
+  function apply(){
+    var t=(q&&q.value||'').trim().toLowerCase(), shown=0;
+    cards.forEach(function(c){
+      var okQ=!t||c.getAttribute('data-search').indexOf(t)>-1,
+          okL=!lens||c.getAttribute('data-lens')===lens;
+      c.hidden=!(okQ&&okL); if(okQ&&okL) shown++;
+    });
+    // a lens heading with nothing under it is noise, so hide it too
+    [].slice.call(document.querySelectorAll('[data-lensgroup]')).forEach(function(h){
+      var name=h.getAttribute('data-lensgroup');
+      h.hidden=!cards.some(function(c){
+        return !c.hidden && c.getAttribute('data-lens')===name;});
+    });
+    if(tally) tally.textContent=(t||lens)
+      ? shown+' of '+cards.length+' shown' : '';
+  }
+  if(q) q.addEventListener('input',apply);
+  chips.forEach(function(b){
+    b.addEventListener('click',function(){
+      var v=b.getAttribute('data-lens');
+      lens = (lens===v) ? null : v;
+      chips.forEach(function(o){
+        o.setAttribute('aria-pressed', o.getAttribute('data-lens')===lens);});
+      apply();
+    });
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key==='/'&&document.activeElement!==q){e.preventDefault();q&&q.focus();}
+    if(e.key==='Escape'&&document.activeElement===q){q.value='';apply();q.blur();}
+  });
+})();
+"""
 
 
 NAV = ('<nav><a href="findings.html">Findings</a>'
-       
        '<a href="codebook.html">Codebook</a>'
        '<a href="discussion.html">Discussion</a></nav>')
 
@@ -528,11 +635,11 @@ def page(D, specs, results, title="Findings"):
          f'<title>{esc(title)}</title>{theme.head_extra(TH)}'
          f'<style>{theme.css_vars(TH)}{CSS_RULES}{theme.PICKER_CSS}</style>'
          '</head><body><div class="wrap">',
-         header(title, f'{touched} of {len(D["keys"])} {D["units"]} '
-                       f'have at least one coding'),
-         NAV, figures(D)]
+         masthead(D, title, f'{touched} of {len(D["keys"])} {D["units"]} '
+                            f'have at least one coding'), NAV]
     for spec, res in zip(specs, results):
         H.append(draw(D, spec, res))
+    H.append(footer(D))
     H.append('</div></body></html>')
     return "".join(H)
 
@@ -659,15 +766,14 @@ def codebook_page(D):
          f'<title>Codebook</title>{theme.head_extra(TH)}'
          f'<style>{theme.css_vars(TH)}{CSS_RULES}{theme.PICKER_CSS}</style>'
          '</head><body><div class="wrap">',
-         header('Codebook', f'prevalence is the share of {n} {D["units"]} '
-                            f'carrying the code'),
-         NAV, figures(D),
-         '<p class="key" style="margin-bottom:18px">' + " ".join(
-             f'<a href="#{esc(L)}">{esc(L)}</a> <span style="color:var(--ink-3)">'
-             f'{len(cs)}</span>' for L, cs in sorted(by_lens.items())) + '</p>']
+         masthead(D, 'Codebook', f'prevalence is the share of {n} {D["units"]} '
+                                 f'carrying the code'),
+         NAV,
+         filter_bar(sorted((L, len(cs)) for L, cs in by_lens.items()),
+                    'definition, rule, code…')]
 
     for lens in sorted(by_lens):
-        H.append(f'<h2 id="{esc(lens)}">{esc(lens)} '
+        H.append(f'<h2 id="{esc(lens)}" data-lensgroup="{esc(lens)}">{esc(lens)} '
                  f'<span class="num">{len(by_lens[lens])} '
                  f'code{"s" if len(by_lens[lens]) != 1 else ""}</span></h2>')
         for cid in by_lens[lens]:
@@ -675,7 +781,11 @@ def codebook_page(D):
             hits = len(D["plays"].get(cid, ()))
             spread = collections.Counter(cd["valence"] for cd, _ in D["by_code"].get(cid, []))
             x, pinned = anchor_for(D, cid)
-            H.append(f'<figure class="fig" id="{esc(cid)}">'
+            hay = " ".join(str(v) for v in
+                           (cid, c.get("name"), c.get("definition"),
+                            c.get("include"), c.get("exclude"))).lower()
+            H.append(f'<figure class="fig" id="{esc(cid)}" '
+                     f'data-lens="{esc(lens)}" data-search="{esc(hay)}">'
                      f'<h3>{esc(cid)} <span class="num" style="float:right">'
                      f'{round(100*hits/n, 1) if n else 0}%</span></h3>'
                      f'<p class="sub" style="margin:2px 0 10px">{esc(c.get("name", ""))}'
@@ -701,6 +811,7 @@ def codebook_page(D):
             elif hits == 0:
                 H.append('<p class="empty">Nothing coded to this yet.</p>')
             H.append('</figure>')
+    H.append(footer(D) + f'<script>{FILTER_JS}</script>')
     H.append('</div></body></html>')
     return "".join(H)
 
@@ -758,7 +869,12 @@ def draw_standing(notes):
          f'{len(by_cat)} categories, shown as written. These are about method, '
          f'not about any one code, and they frame how to read everything below.</p>']
     for cat in sorted(by_cat):
-        H.append(f'<figure class="fig"><h3>{esc(cat)}</h3>')
+        # searchable too: a method note about the weather is exactly the kind of
+        # thing somebody goes looking for, and it lives only in this section
+        hay = " ".join([cat] + [f'{n["id"]} {n["title"]} {n["note"]} {n["quote"][:200]}'
+                                for n in by_cat[cat]]).lower()
+        H.append(f'<figure class="fig" data-search="{esc(hay)}">'
+                 f'<h3>{esc(cat)}</h3>')
         for n in by_cat[cat]:
             H.append('<p class="note">'
                      + (f'<span class="tag">{esc(n["id"])}</span> ' if n["id"] else "")
@@ -788,10 +904,12 @@ def discussion_page(D, notes, summaries, standing=()):
          f'<title>Discussion</title>{theme.head_extra(TH)}'
          f'<style>{theme.css_vars(TH)}{CSS_RULES}{theme.PICKER_CSS}</style>'
          '</head><body><div class="wrap">',
-         header('Discussion',
-                (f'{len(standing)} notes about the study &middot; ' if standing else '')
-                + f'{total} coding notes across {len(notes)} codes'),
+         masthead(D, 'Discussion',
+                  (f'{len(standing)} about the study &middot; ' if standing else '')
+                  + f'{total} coding notes across {len(notes)} codes'),
          NAV,
+         filter_bar(sorted((L, len(cs)) for L, cs in by_lens.items()),
+                    'note, code, passage…'),
          draw_standing(standing),
          ('<h2>By lens</h2><p class="sub" style="margin:6px 0 0">Notes written '
           'beside a coding, grouped by the lens of the code they sit on. Each is '
@@ -800,13 +918,18 @@ def discussion_page(D, notes, summaries, standing=()):
         H.append('<p class="empty">No notes yet. Add a note beside a coding in your '
                  'sheet and re-run.</p>')
     for lens, cids in by_lens.items():
-        H.append(f'<h2>{esc(lens)}</h2>')
+        H.append(f'<h2 data-lensgroup="{esc(lens)}">{esc(lens)}</h2>')
         if summaries.get(lens):
             H.append(f'<div class="ai"><span class="tag">summary &middot; generated</span>'
                      f'<p class="note">{esc(summaries[lens])}</p></div>')
         for cid in cids:
             c = D["codes"].get(cid) or {}
-            H.append(f'<figure class="fig"><h3>{esc(cid)} &middot; {esc(c.get("name", ""))}'
+            hay = " ".join([cid, c.get("name", ""), c.get("definition", "")]
+                           + [n["note"] + " " + n["text"][:300]
+                              for n in notes[cid]]).lower()
+            H.append(f'<figure class="fig" data-lens="{esc(lens)}" '
+                     f'data-search="{esc(hay)}">'
+                     f'<h3>{esc(cid)} &middot; {esc(c.get("name", ""))}'
                      f'</h3><p class="sub" style="margin:2px 0 10px">'
                      f'{len(D["plays"].get(cid, ()))} {D["units"]} &middot; '
                      f'{len(notes[cid])} note{"s" if len(notes[cid]) != 1 else ""}</p>')
@@ -821,6 +944,7 @@ def discussion_page(D, notes, summaries, standing=()):
                              f'{"&hellip;" if len(n["text"]) > 420 else ""}'
                              f'<cite>{n["where"]}</cite></blockquote>')
             H.append('</figure>')
+    H.append(footer(D) + f'<script>{FILTER_JS}</script>')
     H.append('</div></body></html>')
     return "".join(H)
 
