@@ -179,6 +179,59 @@ def delta_e(a, b):
     return 100 * math.dist(oklab(a), oklab(b))
 
 
+def from_oklab(L, a, b):
+    l_ = L + 0.3963377774 * a + 0.2158037573 * b
+    m_ = L - 0.1055613458 * a - 0.0638541728 * b
+    s_ = L - 0.0894841775 * a - 1.2914855480 * b
+    l, m, s = l_ ** 3, m_ ** 3, s_ ** 3
+    lin = (+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+           -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+           -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)
+    def gamma(c):
+        c = max(0.0, min(1.0, c))
+        return 12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055
+    return tuple(gamma(c) for c in lin)
+
+
+def snap(fg_hex, bg_hex, need, steps=80):
+    """Move a colour along its own lightness until it clears `need` against bg.
+
+    A matched palette should not be thrown away because one token missed a floor
+    by a tenth - the site's own orange came back at 2.9:1 against white where 3.0
+    was wanted. Hue and chroma are kept, so the result is still recognisably the
+    colour that was measured; only its lightness moves, and by the smallest step
+    that passes.
+    """
+    fg, bg = parse_hex(fg_hex), parse_hex(bg_hex)
+    if fg is None or bg is None or contrast(fg, bg) >= need:
+        return fg_hex, None
+    L, a, b = oklab(fg)
+    darker = luminance(bg) > 0.4      # light background: darken the mark
+    for i in range(1, steps + 1):
+        t = i / steps
+        cand = from_oklab(L * (1 - t) if darker else L + (1 - L) * t, a, b)
+        if contrast(cand, bg) >= need:
+            return to_hex(cand), round(contrast(cand, bg), 2)
+    return ("#000000" if darker else "#FFFFFF"), None
+
+
+def repair(name, spec):
+    """Nudge any token that misses a floor, and say which ones moved."""
+    t = spec.get("tokens") or {}
+    moved = []
+    for label, fg, bg, need in CHECKS:
+        if not (parse_hex(t.get(fg)) and parse_hex(t.get(bg))):
+            continue
+        if contrast(parse_hex(t[fg]), parse_hex(t[bg])) >= need:
+            continue
+        new, got = snap(t[fg], t[bg], need)
+        if new.upper() != str(t[fg]).upper():
+            moved.append(f"{fg} {t[fg]} -> {new} for {label}"
+                         + (f" ({got}:1)" if got else ""))
+            t[fg] = new
+    return moved
+
+
 CHECKS = [
     ("body text on ground", "ink", "ground", 4.5),
     ("body text on a card", "ink", "surface", 4.5),
@@ -646,6 +699,8 @@ def main():
         from model import current
         name, spec, reply, cost = from_source(a.src, a.model or current())
         name = re.sub(r"[^a-z0-9]", "", (a.name or name).lower()) or "custom"
+        for m in repair(name, spec):
+            print(f"  adjusted: {m}")
         bad, notes = validate_one(name, spec)
         for n in notes:
             print(f"  note: {n}")
