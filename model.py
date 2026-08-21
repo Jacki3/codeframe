@@ -86,14 +86,20 @@ def check(name, timeout=180):
                            encoding="utf-8", errors="replace")
     except subprocess.TimeoutExpired:
         return False, f"no answer within {timeout}s"
+    # The envelope explains itself; the exit code does not. Checking the code
+    # first turns "Not logged in - please run /login" into a wall of JSON.
+    env = None
+    if (p.stdout or "").strip():
+        try:
+            env = json.loads(p.stdout)
+        except json.JSONDecodeError:
+            env = None
+    if env is not None and env.get("is_error"):
+        return False, str(env.get("result") or env.get("terminal_reason"))[:200]
     if p.returncode != 0:
         return False, (p.stderr or p.stdout or "").strip().splitlines()[-1][:160]
-    try:
-        env = json.loads(p.stdout)
-    except json.JSONDecodeError:
+    if env is None:
         return False, "the CLI returned something that was not JSON"
-    if env.get("is_error"):
-        return False, str(env.get("result"))[:160]
     used = ", ".join(sorted(env.get("modelUsage") or {})) or "unknown"
     cost = env.get("total_cost_usd") or 0
     return True, f"answered as {used}" + (f" (${cost:.2f})" if cost else "")

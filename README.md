@@ -180,6 +180,32 @@ source_id, pid, unit, kind, label, text
 plus a `frame.csv` keyed on `pid, unit`. Only `source_id`, `pid`, `unit` and
 `text` are required.
 
+## If you have no Claude account
+
+Most of this does not need one. Only four steps ask a model:
+
+```
+setup_project.py --review          findings.py --add
+valence.py                         findings.py --discussion --summarise
+```
+
+Setup, `--apply`, `file_codings.py`, `serve.py`, `valence.py --offline`,
+`findings.py --generate` and `--discussion` all run on your machine alone. You can
+take a project from raw spreadsheets to a full findings page without ever sending
+anything: the mapping in `setup.json` is editable by hand, valence can come from
+`codes.csv`, and every figure is computed locally in any case.
+
+The four that do ask will tell you what to do rather than failing obscurely:
+
+```
+the claude CLI is installed but not logged in.
+
+    run  claude  on its own, then use  /login
+```
+
+Install the CLI from [claude.com/product/claude-code](https://claude.com/product/claude-code).
+There is no API key to set — the CLI signs in with your account.
+
 ## Choosing the model
 
 ```

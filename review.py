@@ -212,25 +212,59 @@ keep the proposed role and say so in "concerns" - a flagged uncertainty is usefu
 and a confident wrong answer is not."""
 
 
+OFFLINE_NOTE = """
+Nothing else needs an account. Only four steps ask a model:
+    setup_project.py --review          findings.py --add
+    valence.py                         findings.py --discussion --summarise
+Setup, --apply, file_codings.py, serve.py, valence.py --offline,
+findings.py --generate and --discussion all run on your machine alone,
+and every step that does send something takes --dry-run."""
+
+
+def explain(env):
+    """Turn the CLI's own error into something the reader can act on."""
+    msg = str(env.get("result") or env.get("terminal_reason") or "").strip()
+    low = msg.lower()
+    if "not logged in" in low or "/login" in low:
+        return ("the claude CLI is installed but not logged in.\n\n"
+                "    run  claude  on its own, then use  /login\n" + OFFLINE_NOTE)
+    if "unrecognized_model" in low or "model" in low:
+        return (f"the claude CLI would not accept that model:\n    {msg[:200]}\n\n"
+                "    run  python model.py  to see the names known to work.")
+    return f"the claude CLI reported a problem:\n    {msg[:400]}\n" + OFFLINE_NOTE
+
+
 def ask(payload, model=None, timeout=600, task=None):
+    from model import current
+    model = model or current()
     exe = shutil.which("claude")
     if not exe:
         raise SystemExit(
-            "the claude CLI was not found on PATH.\n"
-            "Install it, or edit setup.json by hand - the review step is optional.")
+            "the claude CLI was not found on PATH.\n\n"
+            "    install it from claude.com/product/claude-code,\n"
+            "    then run  claude  and use  /login\n" + OFFLINE_NOTE)
     prompt = (task or TASK) + "\n\nINPUT\n" + json.dumps(payload, indent=1)
     p = subprocess.run(
         [exe, "-p", "--output-format", "json", "--model", model],
         input=prompt, capture_output=True, text=True, timeout=timeout,
         encoding="utf-8", errors="replace")
+
+    # Read the envelope BEFORE the exit code. The CLI exits non-zero and puts a
+    # perfectly good explanation inside the JSON - "Not logged in" being the one
+    # every new user meets - and checking the exit code first buries it under
+    # eight hundred characters of usage counters.
+    env = None
+    if (p.stdout or "").strip():
+        try:
+            env = json.loads(p.stdout)
+        except json.JSONDecodeError:
+            env = None
+    if env is not None and env.get("is_error"):
+        raise SystemExit(explain(env))
     if p.returncode != 0:
         raise SystemExit(f"claude exited {p.returncode}:\n{(p.stderr or p.stdout)[:800]}")
-    try:
-        env = json.loads(p.stdout)
-    except json.JSONDecodeError:
+    if env is None:
         raise SystemExit(f"could not read the CLI response:\n{p.stdout[:800]}")
-    if env.get("is_error"):
-        raise SystemExit(f"claude reported an error:\n{str(env.get('result'))[:800]}")
     return unwrap(env.get("result") or ""), env
 
 
