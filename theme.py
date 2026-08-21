@@ -51,6 +51,9 @@ COLOURS = ["ground", "surface", "surface-2", "ink", "ink-2", "ink-3",
            "pos", "neg", "mixed", "neutral", "none", "series-a", "series-b",
            "mark", "mark-ink", "warn"]
 FONTS = ["font-display", "font-body", "font-mono"]
+# Not colours: the shape of a box. A site with 3px corners and one with 14px do
+# not look alike however well the palette matches, so these travel with a theme.
+SHAPE = {"radius": "4px", "radius-sm": "2px", "border": "1px"}
 
 DEFAULT_FONTS = {
     "font-display": '"Palatino Linotype","Book Antiqua",Palatino,'
@@ -238,7 +241,7 @@ def path_of(root):
 
 
 def blank():
-    return {"default": "light", "fonts": dict(DEFAULT_FONTS),
+    return {"default": "light", "fonts": dict(DEFAULT_FONTS), "shape": dict(SHAPE),
             "themes": json.loads(json.dumps(BUILTIN))}
 
 
@@ -249,6 +252,7 @@ def load(root):
             t = json.load(open(p, encoding="utf-8"))
             if t.get("themes"):
                 t.setdefault("fonts", dict(DEFAULT_FONTS))
+                t.setdefault("shape", dict(SHAPE))
                 t.setdefault("default", next(iter(t["themes"])))
                 return t
         except (json.JSONDecodeError, OSError):
@@ -301,9 +305,11 @@ def css_vars(project):
         out = "".join(f"  --{k}:{t.get(k, '#888888')};\n" for k in COLOURS)
         return out + f"  --shadow:{spec.get('shadow', SHADOW['light'])};\n"
 
+    shape = {**SHAPE, **(project.get("shape") or {})}
     css = (":root{\n  color-scheme:" + themes[dflt].get("scheme", "light") + ";\n"
            + body(themes[dflt])
-           + "".join(f"  --{k}:{v};\n" for k, v in fonts.items()) + "}\n")
+           + "".join(f"  --{k}:{v};\n" for k, v in fonts.items())
+           + "".join(f"  --{k}:{v};\n" for k, v in shape.items()) + "}\n")
     for name, spec in themes.items():
         css += (f'[data-theme="{name}"]{{\n  color-scheme:'
                 + spec.get("scheme", "light") + ";\n" + body(spec) + "}\n")
@@ -407,6 +413,11 @@ Say whether the result is a light theme or a dark one, then give every token.
   mark-ink      text on top of mark
   warn          destructive actions
 
+Also give the SHAPE of a box, matched to the source: "radius" for cards and
+figures, "radius-sm" for small chips and bars, "border" for hairline width. Use
+CSS lengths, e.g. "4px". A site with square corners and one with pill-shaped
+buttons are not the same house style even with the same palette.
+
 Reply with JSON only:
 
 {"name": "<one lowercase word, no spaces>",
@@ -415,6 +426,7 @@ Reply with JSON only:
  "tokens": {"ground": "#RRGGBB", ...every token above...},
  "fonts": {"font-display": "<css stack>", "font-body": "<css stack>",
            "font-mono": "<css stack>"},
+ "shape": {"radius": "4px", "radius-sm": "2px", "border": "1px"},
  "google_fonts": "<stylesheet url, or omit>",
  "why": "<one sentence on what you took from the source>"}
 
@@ -471,6 +483,8 @@ def show(project):
     f = {**DEFAULT_FONTS, **(project.get("fonts") or {})}
     for k in FONTS:
         print(f"  {k:<13} {f[k][:56]}")
+    sh = {**SHAPE, **(project.get("shape") or {})}
+    print(f"  {'shape':<13} " + "  ".join(f"{k} {v}" for k, v in sh.items()))
     print()
     for name, spec in themes.items():
         bad, _ = validate_one(name, spec)
@@ -521,6 +535,11 @@ def main():
             project["fonts"] = {**DEFAULT_FONTS, **reply["fonts"]}
         if reply.get("google_fonts"):
             project["google_fonts"] = reply["google_fonts"]
+        if isinstance(reply.get("shape"), dict):
+            keep = {k: str(v)[:12] for k, v in reply["shape"].items()
+                    if k in SHAPE and re.fullmatch(r"[0-9.]+(px|rem|em)", str(v))}
+            if keep:
+                project["shape"] = {**SHAPE, **keep}
         project["default"] = name
         changed = True
         print(f"\nadded theme {name!r} ({spec['label']}) and made it the default")

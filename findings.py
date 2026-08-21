@@ -315,14 +315,14 @@ CSS_RULES = """
 .topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;
  flex-wrap:wrap;margin-bottom:8px}
 .figures{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 26px}
-.figures div{background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+.figures div{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius);
  padding:9px 14px;box-shadow:var(--shadow)}
 .figures b{display:block;font:600 20px/1.2 var(--font-display);color:var(--ink)}
 .figures span{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;
  text-transform:uppercase;color:var(--ink-3)}
 h1,h2,h3{font-family:var(--font-display);font-weight:600}
 .fig{box-shadow:var(--shadow)}
-.rule-inc,.rule-exc{border-radius:2px;padding:7px 11px;margin:7px 0}
+.rule-inc,.rule-exc{border-radius:var(--radius-sm);padding:7px 11px;margin:7px 0}
 .rule-inc{background:var(--include-wash);color:var(--include)}
 .rule-exc{background:var(--exclude-wash);color:var(--exclude)}
 .rule-inc .tag,.rule-exc .tag{background:transparent;color:inherit;opacity:.75}
@@ -334,17 +334,17 @@ h3{font-size:16px;margin:0 0 3px}
 .sub{color:var(--ink-3);font-family:var(--font-mono);font-size:11.5px;margin:0 0 26px;line-height:1.7}
 nav{margin:0 0 26px;font-family:var(--font-mono);font-size:12px}
 nav a{color:var(--accent-ink);margin-right:14px}
-.fig{background:var(--surface);border:1px solid var(--rule);border-radius:4px;
+.fig{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius);
  padding:19px 22px;margin:16px 0 0}
 figcaption{color:var(--ink-3);font-size:12.5px;margin-top:13px;line-height:1.6}
 .bar-row{display:grid;grid-template-columns:210px 1fr 62px;gap:11px;align-items:center;
  margin-bottom:5px;font-size:13.5px}
 .lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);
  font-size:11.5px;color:var(--ink-2)}
-.bar-track{display:block;background:var(--surface-2);border-radius:2px;height:17px;overflow:hidden}
-.bar-fill{display:block;height:100%;background:var(--accent);border-radius:2px}
+.bar-track{display:block;background:var(--surface-2);border-radius:var(--radius-sm);height:17px;overflow:hidden}
+.bar-fill{display:block;height:100%;background:var(--accent);border-radius:var(--radius-sm)}
 .num{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3);text-align:right}
-.stack{display:flex;height:17px;border-radius:2px;overflow:hidden;background:var(--surface-2)}
+.stack{display:flex;height:17px;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-2)}
 .stack i{display:block;height:100%}
 .pos{background:var(--pos)}
 .stack i.mixed{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.30) 0 2px,transparent 2px 5px)}.neg{background:var(--neg)}.mixed{background:var(--mixed)}
@@ -356,17 +356,17 @@ th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter
 th.r,td.r{text-align:right}
 td{padding:4px 6px;border-top:1px solid var(--rule)}
 td.code{font-family:var(--font-mono);font-size:11px;color:var(--ink-2);white-space:nowrap}
-.cell{text-align:center;font-family:var(--font-mono);font-size:11px;border-radius:2px}
+.cell{text-align:center;font-family:var(--font-mono);font-size:11px;border-radius:var(--radius-sm)}
 .key{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);margin-top:11px}
-.key i{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;
+.key i{display:inline-block;width:11px;height:11px;border-radius:var(--radius-sm);vertical-align:-1px;
  margin:0 4px 0 12px}
-.q{background:var(--surface-2);border-left:3px solid var(--accent);border-radius:2px;
+.q{background:var(--surface-2);border-left:3px solid var(--accent);border-radius:var(--radius-sm);
  padding:9px 13px;margin:9px 0;font-size:14px;color:var(--ink-2)}
 .q cite{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);
  font-style:normal;margin-top:6px}
 .note{font-size:14px;margin:5px 0 14px}
 .tag{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;
- color:var(--accent-ink);background:var(--accent-wash);padding:2px 7px;border-radius:2px}
+ color:var(--accent-ink);background:var(--accent-wash);padding:2px 7px;border-radius:var(--radius-sm)}
 .ai{border-left:3px solid var(--mixed);padding-left:13px;margin:11px 0}
 .ai .tag{color:var(--mixed);background:transparent;padding:0}
 .empty{color:var(--ink-3);font-style:italic;font-size:14px}
