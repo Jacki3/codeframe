@@ -315,13 +315,13 @@ def default_specs(D):
 
 CSS_RULES = """
 *{box-sizing:border-box}
-.masthead{margin-bottom:6px}
+.masthead{margin-bottom:0}
 .eyebrow{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.11em;
  text-transform:uppercase;color:var(--accent-ink);margin:0 0 6px}
-.standfirst{font-size:17px;line-height:1.65;color:var(--ink-2);max-width:62ch;margin:14px 0 0}
-.toolbar{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;
+.standfirst{font-size:17.5px;line-height:1.7;color:var(--ink-2);max-width:64ch;margin:20px 0 0}
+.toolbar{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end;
  background:var(--surface);border:var(--border) solid var(--rule);
- border-radius:var(--radius);padding:13px 16px;margin:0 0 6px;box-shadow:var(--shadow)}
+ border-radius:var(--radius);padding:18px 22px;margin:0 0 8px;box-shadow:var(--shadow)}
 .field{display:flex;flex-direction:column;gap:5px;min-width:230px;flex:1}
 .field label{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;
  text-transform:uppercase;color:var(--ink-3)}
@@ -338,39 +338,39 @@ CSS_RULES = """
 [hidden]{display:none !important}
 footer{margin-top:44px;padding-top:16px;border-top:var(--border) solid var(--rule);
  font-family:var(--font-mono);font-size:11px;color:var(--ink-3)}
-.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;
- flex-wrap:wrap;margin-bottom:8px}
-.figures{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 26px}
-.figures div{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius);
- padding:9px 14px;box-shadow:var(--shadow)}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;
+ flex-wrap:wrap;margin-bottom:0}
+.figures{display:flex;flex-wrap:wrap;gap:12px;margin:30px 0 0}
+.figures div{background:var(--surface);border:var(--border) solid var(--rule);border-radius:var(--radius);
+ padding:13px 19px;box-shadow:var(--shadow)}
 .figures b{display:block;font:600 20px/1.2 var(--font-display);color:var(--ink)}
 .figures span{font-family:var(--font-mono);font-size:10px;letter-spacing:.09em;
  text-transform:uppercase;color:var(--ink-3)}
 h1,h2,h3{font-family:var(--font-display);font-weight:600}
 .fig{box-shadow:var(--shadow)}
-.rule-inc,.rule-exc{border-radius:var(--radius-sm);padding:7px 11px;margin:7px 0}
+.rule-inc,.rule-exc{border-radius:var(--radius-sm);padding:11px 15px;margin:11px 0;line-height:1.65}
 .rule-inc{background:var(--include-wash);color:var(--include)}
 .rule-exc{background:var(--exclude-wash);color:var(--exclude)}
 .rule-inc .tag,.rule-exc .tag{background:transparent;color:inherit;opacity:.75}
-body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.6 var(--font-body)}
-.wrap{max-width:980px;margin:0 auto;padding:34px 24px 100px}
-h1{font-size:25px;margin:0 0 4px}
-h2{font-size:18px;margin:44px 0 0;padding-top:20px;border-top:1px solid var(--rule)}
-h3{font-size:16px;margin:0 0 3px}
-.sub{color:var(--ink-3);font-family:var(--font-mono);font-size:11.5px;margin:0 0 26px;line-height:1.7}
-nav{margin:0 0 26px;font-family:var(--font-mono);font-size:12px}
-nav a{color:var(--accent-ink);margin-right:14px}
-.fig{background:var(--surface);border:1px solid var(--rule);border-radius:var(--radius);
- padding:19px 22px;margin:16px 0 0}
-figcaption{color:var(--ink-3);font-size:12.5px;margin-top:13px;line-height:1.6}
-.bar-row{display:grid;grid-template-columns:210px 1fr 62px;gap:11px;align-items:center;
- margin-bottom:5px;font-size:13.5px}
+body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.7 var(--font-body)}
+.wrap{max-width:1060px;margin:0 auto;padding:52px 32px 120px}
+h1{font-size:30px;margin:0 0 6px;line-height:1.25}
+h2{font-size:20px;margin:64px 0 0;padding-top:28px;border-top:var(--border) solid var(--rule)}
+h3{font-size:17px;margin:0 0 5px;line-height:1.35}
+.sub{color:var(--ink-3);font-family:var(--font-mono);font-size:11.5px;margin:0;line-height:1.7}
+nav{margin:26px 0 22px;font-family:var(--font-mono);font-size:12.5px;border-bottom:var(--border) solid var(--rule);padding-bottom:12px}
+nav a{color:var(--accent-ink);margin-right:22px;text-decoration:none;border-bottom:2px solid transparent;padding-bottom:11px}nav a:hover{border-bottom-color:var(--accent)}
+.fig{background:var(--surface);border:var(--border) solid var(--rule);border-radius:var(--radius);
+ padding:28px 32px;margin:22px 0 0}
+figcaption{color:var(--ink-3);font-size:12.5px;margin-top:22px;line-height:1.65;padding-top:14px;border-top:var(--border) solid var(--rule-soft)}
+.bar-row{display:grid;grid-template-columns:215px 1fr 62px;gap:14px;align-items:center;
+ margin-bottom:9px;font-size:13.5px}
 .lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);
  font-size:11.5px;color:var(--ink-2)}
-.bar-track{display:block;background:var(--surface-2);border-radius:var(--radius-sm);height:17px;overflow:hidden}
+.bar-track{display:block;background:var(--surface-2);border-radius:var(--radius-sm);height:20px;overflow:hidden}
 .bar-fill{display:block;height:100%;background:var(--accent);border-radius:var(--radius-sm)}
 .num{font-family:var(--font-mono);font-size:11.5px;color:var(--ink-3);text-align:right}
-.stack{display:flex;height:17px;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-2)}
+.stack{display:flex;height:20px;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-2);gap:2px}
 .stack i{display:block;height:100%}
 .pos{background:var(--pos)}
 .stack i.mixed{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.30) 0 2px,transparent 2px 5px)}.neg{background:var(--neg)}.mixed{background:var(--mixed)}
@@ -378,19 +378,19 @@ figcaption{color:var(--ink-3);font-size:12.5px;margin-top:13px;line-height:1.6}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;font-size:13px;min-width:420px}
 th{font-family:var(--font-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
- color:var(--ink-3);text-align:left;padding:0 6px 7px;font-weight:400}
+ color:var(--ink-3);text-align:left;padding:0 10px 11px;font-weight:400}
 th.r,td.r{text-align:right}
-td{padding:4px 6px;border-top:1px solid var(--rule)}
+td{padding:8px 10px;border-top:var(--border) solid var(--rule-soft)}
 td.code{font-family:var(--font-mono);font-size:11px;color:var(--ink-2);white-space:nowrap}
 .cell{text-align:center;font-family:var(--font-mono);font-size:11px;border-radius:var(--radius-sm)}
 .key{font-family:var(--font-mono);font-size:11px;color:var(--ink-3);margin-top:11px}
 .key i{display:inline-block;width:11px;height:11px;border-radius:var(--radius-sm);vertical-align:-1px;
  margin:0 4px 0 12px}
 .q{background:var(--surface-2);border-left:3px solid var(--accent);border-radius:var(--radius-sm);
- padding:9px 13px;margin:9px 0;font-size:14px;color:var(--ink-2)}
+ padding:16px 20px;margin:16px 0;font-size:14.5px;line-height:1.7;color:var(--ink-2)}
 .q cite{display:block;font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3);
- font-style:normal;margin-top:6px}
-.note{font-size:14px;margin:5px 0 14px}
+ font-style:normal;margin-top:11px}
+.note{font-size:14.5px;margin:9px 0 16px;line-height:1.7}
 .tag{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;
  color:var(--accent-ink);background:var(--accent-wash);padding:2px 7px;border-radius:var(--radius-sm)}
 .ai{border-left:3px solid var(--mixed);padding-left:13px;margin:11px 0}
@@ -679,17 +679,60 @@ def build(D, specs):
     return kept, results
 
 
+def summaries_path(root):
+    return os.path.join(out_dir(root), "summaries.json")
+
+
+def load_summaries(root):
+    p = summaries_path(root)
+    if os.path.exists(p):
+        try:
+            return json.load(open(p, encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def build_all(D, specs=None, results=None, quiet=False):
+    """Write all three pages.
+
+    They share a masthead, a nav, a theme and a figures strip, so any of those
+    changing changes all three. Rebuilding one at a time left a project whose
+    title was updated on the findings page and stale on the other two - and made
+    changing a heading a three-command job. Everything is computed from one load
+    already, so writing all three costs almost nothing.
+    """
+    root = D["root"]
+    if specs is None:
+        specs, results = build(D, load_specs(root) or default_specs(D))
+    notes = gather_notes(D)
+    standing = standing_notes(root, D)
+    written = [
+        (os.path.join(out_dir(root), "findings.html"), page(D, specs, results)),
+        (os.path.join(out_dir(root), "codebook.html"), codebook_page(D)),
+        (os.path.join(out_dir(root), "discussion.html"),
+         discussion_page(D, notes, load_summaries(root), standing)),
+    ]
+    for p, html in written:
+        write(p, html)
+    if not quiet:
+        print(f"wrote {len(written)} pages in {out_dir(root)}")
+        print(f"  findings   {len(specs)} figures")
+        print(f"  codebook   {len(D['codes'])} codes")
+        print(f"  discussion {len(standing)} about the study, "
+              f"{sum(len(v) for v in notes.values())} coding notes")
+    return specs, results
+
+
 def cmd_generate(root, keep_custom=True):
     D = load(root)
     existing = [s for s in load_specs(root) if s.get("custom")] if keep_custom else []
     specs = default_specs(D) + existing
     specs, results = build(D, specs)
     write(specs_path(root), json.dumps(specs, indent=1))
-    p = os.path.join(out_dir(root), "findings.html")
-    write(p, page(D, specs, results))
-    print(f"wrote {p}")
+    build_all(D, specs, results)
     for s in specs:
-        print(f"  {s['id']:<20} {s.get('title', '')}"
+        print(f"  figure: {s['id']:<18} {s.get('title', '')}"
               + ("   [custom]" if s.get("custom") else ""))
     return D
 
@@ -989,11 +1032,9 @@ def summarise(D, notes, lens_of, model):
 
 def cmd_codebook(root):
     D = load(root)
-    p = os.path.join(out_dir(root), "codebook.html")
-    write(p, codebook_page(D))
+    build_all(D)
     pinned = sum(1 for cid in D["codes"] if anchor_for(D, cid)[1])
     empty = [cid for cid in D["codes"] if not D["plays"].get(cid)]
-    print(f"wrote {p}")
     print(f"  {len(D['codes'])} codes, {pinned} with a pinned anchor, "
           f"{len(D['codes']) - pinned} auto-chosen")
     if empty:
@@ -1114,7 +1155,7 @@ def cmd_add(root, request, model):
     specs = load_specs(root) + [spec]
     write(specs_path(root), json.dumps(specs, indent=1))
     specs, results = build(D, specs)
-    write(os.path.join(out_dir(root), "findings.html"), page(D, specs, results))
+    build_all(D, specs, results, quiet=True)
     cost = env.get("total_cost_usd")
     print(f"\nadded {spec['id']}: {spec['title']}")
     print(f"  kind: {kind}" + (f" by {spec['by']}" if spec.get("by") else ""))

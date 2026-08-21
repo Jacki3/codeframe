@@ -157,6 +157,10 @@ python findings.py --data ../myproject --discussion --summarise
 python findings.py --data ../myproject --add "differences between the two conditions for the top ten codes"
 ```
 
+**Any of these rebuilds all three pages.** They share a masthead, a nav, a theme
+and a figures strip, so a change to any of those changes all three — and updating
+a heading should not be a three-command job.
+
 Every figure is a **spec** — a small JSON object saying what to compare — kept in
 `findings/specs.json`. Rendering is deterministic from spec plus data, so the page
 rebuilds from the corpus and two people with the same corpus get the same page.
