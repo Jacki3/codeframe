@@ -369,6 +369,12 @@ figcaption{color:var(--ink-3);font-size:12.5px;margin-top:22px;line-height:1.65;
  font-size:11.5px;color:var(--ink-2)}
 .bar-track{display:block;background:var(--surface-2);border-radius:var(--radius-sm);height:20px;overflow:hidden}
 .bar-fill{display:block;height:100%;background:var(--accent);border-radius:var(--radius-sm);min-width:3px}
+.pick{float:left;margin:2px 11px 0 0;cursor:pointer}
+.pick input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0}
+.fig:has(input[data-pick]:checked){border-color:var(--accent);
+ box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.chip[disabled]{opacity:.45;cursor:default}
+.chip[disabled]:hover{border-color:var(--rule)}
 .prev{display:grid;grid-template-columns:1fr 54px 62px;gap:12px;align-items:center;margin:0 0 20px}
 .prev .num{text-align:right}
 .prev .of{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-3)}
@@ -450,11 +456,22 @@ def footer(D):
     return '<footer>' + " &middot; ".join(bits) + '</footer>'
 
 
-def filter_bar(lenses, placeholder):
-    """Search and lens chips. Filters cards in the page; no reload, no server."""
+def filter_bar(lenses, placeholder, pickable=False):
+    """Search, lens chips and a selection. Filters in the page; no reload.
+
+    Lenses combine rather than replace: a reader comparing enjoyment against
+    place wants both at once, and having the second chip cancel the first is the
+    kind of thing that makes a filter feel broken.
+    """
     chips = "".join(
         f'<button class="chip" type="button" aria-pressed="false" '
         f'data-lens="{esc(l)}">{esc(l)} <b>{n}</b></button>' for l, n in lenses)
+    sel = ('<div class="field"><label>Selection</label>'
+           '<div class="filters">'
+           '<button class="chip" type="button" id="only" aria-pressed="false" '
+           'disabled>Show only picked <b id="npick">0</b></button>'
+           '<button class="chip" type="button" id="clearsel" disabled>Clear</button>'
+           '</div></div>') if pickable else ""
     return (f'<div class="toolbar">'
             f'<div class="field"><label for="q">Search '
             f'<span style="text-transform:none;letter-spacing:0">(press /)</span>'
@@ -462,22 +479,33 @@ def filter_bar(lenses, placeholder):
             f'placeholder="{esc(placeholder)}"></div>'
             + (f'<div class="field"><label>Filter by lens</label>'
                f'<div class="filters">{chips}</div></div>' if chips else "")
+            + sel
             + f'</div><p class="tally" id="tally"></p>')
 
 
 FILTER_JS = """
 (function(){
-  var q=document.getElementById('q'), cards=[].slice.call(
-        document.querySelectorAll('[data-search]')),
-      chips=[].slice.call(document.querySelectorAll('.chip')),
-      tally=document.getElementById('tally'), lens=null;
+  var q=document.getElementById('q'),
+      cards=[].slice.call(document.querySelectorAll('[data-search]')),
+      chips=[].slice.call(document.querySelectorAll('.chip[data-lens]')),
+      tally=document.getElementById('tally'),
+      only=document.getElementById('only'),
+      clearsel=document.getElementById('clearsel'),
+      npick=document.getElementById('npick'),
+      lenses={}, picked={}, onlyPicked=false, last=null;
   if(!cards.length) return;
+
+  function count(o){var n=0; for(var k in o) if(o[k]) n++; return n;}
+
   function apply(){
-    var t=(q&&q.value||'').trim().toLowerCase(), shown=0;
+    var t=(q&&q.value||'').trim().toLowerCase(),
+        nl=count(lenses), np=count(picked), shown=0;
     cards.forEach(function(c){
       var okQ=!t||c.getAttribute('data-search').indexOf(t)>-1,
-          okL=!lens||c.getAttribute('data-lens')===lens;
-      c.hidden=!(okQ&&okL); if(okQ&&okL) shown++;
+          okL=!nl||lenses[c.getAttribute('data-lens')],
+          okP=!onlyPicked||picked[c.getAttribute('data-code')],
+          ok=okQ&&okL&&okP;
+      c.hidden=!ok; if(ok) shown++;
     });
     // a lens heading with nothing under it is noise, so hide it too
     [].slice.call(document.querySelectorAll('[data-lensgroup]')).forEach(function(h){
@@ -485,23 +513,62 @@ FILTER_JS = """
       h.hidden=!cards.some(function(c){
         return !c.hidden && c.getAttribute('data-lens')===name;});
     });
-    if(tally) tally.textContent=(t||lens)
-      ? shown+' of '+cards.length+' shown' : '';
+    if(npick) npick.textContent=np;
+    if(only){only.disabled=!np; only.setAttribute('aria-pressed',onlyPicked);}
+    if(clearsel) clearsel.disabled=!np;
+    if(!np&&onlyPicked) onlyPicked=false;
+    if(tally) tally.textContent=(t||nl||onlyPicked)
+      ? shown+' of '+cards.length+' shown'+(np?' \\u00b7 '+np+' picked':'')
+      : (np? np+' picked' : '');
   }
+
   if(q) q.addEventListener('input',apply);
+
+  // lenses accumulate: clicking a second one adds it rather than replacing
   chips.forEach(function(b){
     b.addEventListener('click',function(){
       var v=b.getAttribute('data-lens');
-      lens = (lens===v) ? null : v;
-      chips.forEach(function(o){
-        o.setAttribute('aria-pressed', o.getAttribute('data-lens')===lens);});
+      lenses[v]=!lenses[v];
+      b.setAttribute('aria-pressed',!!lenses[v]);
       apply();
     });
   });
+
+  // pick individual codes, with shift for a run of them
+  [].slice.call(document.querySelectorAll('[data-pick]')).forEach(function(box,i){
+    box.addEventListener('change',function(ev){
+      var code=box.getAttribute('data-pick');
+      picked[code]=box.checked;
+      if(ev.shiftKey&&last!==null&&last!==i){
+        var boxes=[].slice.call(document.querySelectorAll('[data-pick]')),
+            a=Math.min(last,i), b=Math.max(last,i);
+        for(var j=a;j<=b;j++){
+          if(boxes[j].closest('[data-search]').hidden) continue;
+          boxes[j].checked=box.checked;
+          picked[boxes[j].getAttribute('data-pick')]=box.checked;
+        }
+      }
+      last=i;
+      apply();
+    });
+  });
+
+  if(only) only.addEventListener('click',function(){
+    onlyPicked=!onlyPicked; apply();
+    if(onlyPicked) window.scrollTo({top:0,behavior:'smooth'});
+  });
+  if(clearsel) clearsel.addEventListener('click',function(){
+    picked={}; onlyPicked=false; last=null;
+    [].slice.call(document.querySelectorAll('[data-pick]')).forEach(function(b){
+      b.checked=false;});
+    apply();
+  });
+
   document.addEventListener('keydown',function(e){
     if(e.key==='/'&&document.activeElement!==q){e.preventDefault();q&&q.focus();}
     if(e.key==='Escape'&&document.activeElement===q){q.value='';apply();q.blur();}
   });
+  apply();
 })();
 """
 
@@ -834,7 +901,7 @@ def codebook_page(D):
                                  f'carrying the code'),
          NAV,
          filter_bar(sorted((L, len(cs)) for L, cs in by_lens.items()),
-                    'definition, rule, code…')]
+                    'definition, rule, code…', pickable=True)]
 
     for lens in sorted(by_lens):
         H.append(f'<h2 id="{esc(lens)}" data-lensgroup="{esc(lens)}">{esc(lens)} '
@@ -849,8 +916,12 @@ def codebook_page(D):
                            (cid, c.get("name"), c.get("definition"),
                             c.get("include"), c.get("exclude"))).lower()
             H.append(f'<figure class="fig" id="{esc(cid)}" '
-                     f'data-lens="{esc(lens)}" data-search="{esc(hay)}">'
-                     f'<h3>{esc(cid)}</h3>'
+                     f'data-lens="{esc(lens)}" data-code="{esc(cid)}" '
+                     f'data-search="{esc(hay)}">'
+                     f'<h3><label class="pick" title="Pick this code '
+                     f'(shift-click for a run)">'
+                     f'<input type="checkbox" data-pick="{esc(cid)}">'
+                     f'</label>{esc(cid)}</h3>'
                      f'<p class="sub" style="margin:2px 0 12px">{esc(c.get("name", ""))}'
                      + (f' &middot; declared {esc(c["valence"])}' if c.get("valence") else "")
                      + (' &middot; ' + ", ".join(f"{k or 'unjudged'} {v}"

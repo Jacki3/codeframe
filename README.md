@@ -246,6 +246,13 @@ showing what it means. Code ids mentioned in an exclude rule become links, since
 those rules are mostly cross-references and following them by hand is how a
 codebook stops being read.
 
+**Lenses combine and codes can be picked.** Clicking a second lens chip adds it
+rather than replacing the first, so you can read enjoyment and place together.
+Every code has a checkbox: tick several — shift-click for a run — then *Show only
+picked* to read just those side by side, whatever lens they belong to. Search
+narrows within the selection, and the tally says how much of the codebook you are
+looking at.
+
 Each code carries a prevalence bar on a **0–100 scale**, not scaled to the most
 common code: a bar scaled to the leader makes the top code look total whatever it
 actually reached, which is the wrong impression to give about a corpus where
