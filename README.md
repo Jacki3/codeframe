@@ -16,6 +16,21 @@ project belongs under git and every figure regenerates from the source.
 
 ---
 
+## What is here
+
+| | |
+|---|---|
+| `setup_project.py` | profile raw data, propose a mapping, build the project |
+| `review.py` | the optional model check of that mapping, and the only place a request is sent |
+| `file_codings.py` | file a coding spreadsheet against the corpus |
+| `valence.py` | settle valences left blank |
+| `project.py` | project state, shared by the tools |
+| `serve.py` | the browser coding tool |
+| `findings.py` | build the findings, codebook and discussion pages |
+| `siteinfo.py` | what the site calls itself |
+| `theme.py` | the themes it ships with |
+| `model.py` | which model the model-backed steps use |
+
 ## Before you start
 
 Python 3.9 or newer, and `openpyxl` if your raw data is `.xlsx`. That is all most
@@ -48,6 +63,57 @@ model: sonnet   (default)
 
 If you would rather not sign in at all, read *[If you have no Claude
 account](#if-you-have-no-claude-account)* below — nearly everything still works.
+
+---
+
+## Every command
+
+Nine scripts. Only `--from`, `--review`, `--add`, `--summarise` and `valence.py`
+ever call a model; everything else runs on your machine alone.
+
+**Setting up** — `setup_project.py`
+
+```
+python setup_project.py --raw ../raw --to ../myproject [--skip folder,folder]
+python setup_project.py --to ../myproject --review [--dry-run] [--model NAME]
+python setup_project.py --to ../myproject --apply [--allow-rename]
+```
+
+**Coding** — `file_codings.py`, `valence.py`, `serve.py`
+
+```
+python file_codings.py --data ../myproject --sheet coding.csv [--apply] [--allow-new-codes] [--coder NAME]
+python valence.py --data ../myproject [--dry-run | --offline] [--apply] [--batch N]
+python serve.py --data ../myproject [--port N] [--read-only] [--no-open] [--coder NAME]
+```
+
+**Building the site** — `findings.py`
+
+```
+python findings.py --data ../myproject --generate
+python findings.py --data ../myproject --codebook
+python findings.py --data ../myproject --discussion [--summarise]
+python findings.py --data ../myproject --add "a request in words"
+```
+
+**Any of those four writes all three pages.** They share a masthead, a nav, a
+theme and a figures strip, so a change to any of those changes all three —
+updating a heading should not be a three-command job. The flag chooses what to
+*recompute*, not what to write. Generated summaries are cached in
+`findings/summaries.json`, so a rebuild never drops paragraphs you paid for.
+
+**Appearance and identity** — `siteinfo.py`, `theme.py`, `model.py`
+
+```
+python siteinfo.py --data ../myproject --init
+python siteinfo.py --data ../myproject --title T --version V --project P --description D --authors "A, B" --footer F
+python theme.py --data ../myproject [--list] [--default NAME] [--drop NAME] [--reset]
+python theme.py --data ../myproject --from SOURCE [--name NAME] [--force]
+python theme.py --data ../myproject --favicon logo.png
+python model.py [NAME] [--check] [--login] [--clear]
+```
+
+After any of those, rebuild with `findings.py --generate` to see the change.
 
 ---
 
