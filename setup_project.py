@@ -662,7 +662,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="with --review: print what would be sent and send nothing")
     ap.add_argument("--model", default=None,
-                    help="override the model set by model.py, for this run", help="model for --review")
+                    help="model for --review; overrides the one model.py sets")
     ap.add_argument("--apply", action="store_true", help="build from a corrected setup.json")
     ap.add_argument("--allow-rename", action="store_true",
                     help="permit renaming a frame column that already exists")
