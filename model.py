@@ -69,6 +69,33 @@ def save(name):
     os.replace(tmp, CONFIG)
 
 
+def auth(timeout=60):
+    """Whether the CLI is signed in. Free, instant, and sends nothing.
+
+    `claude auth status` answers locally and exits non-zero when signed out, so
+    this is the check to run before anything that would cost money - and the one
+    to run first when a step fails, because "not logged in" is by far the most
+    likely reason.
+    """
+    exe = shutil.which("claude")
+    if not exe:
+        return None, "the claude CLI is not on PATH"
+    try:
+        p = subprocess.run([exe, "auth", "status"], capture_output=True, text=True,
+                           timeout=timeout, encoding="utf-8", errors="replace")
+    except (subprocess.TimeoutExpired, OSError):
+        return None, "could not run `claude auth status`"
+    try:
+        d = json.loads(p.stdout)
+    except (json.JSONDecodeError, TypeError):
+        return None, (p.stdout or p.stderr or "").strip()[:120] or "no answer"
+    if not d.get("loggedIn"):
+        return False, "signed out"
+    who = d.get("email") or d.get("authMethod") or "signed in"
+    plan = d.get("subscriptionType")
+    return True, f"{who}" + (f" ({plan})" if plan else "")
+
+
 def check(name, timeout=180):
     """Ask the CLI to answer something trivial, and see whether it accepts the model.
 
@@ -79,6 +106,11 @@ def check(name, timeout=180):
     exe = shutil.which("claude")
     if not exe:
         return False, "the claude CLI was not found on PATH"
+    # Signed-out is the likeliest reason and costs nothing to rule out, so rule it
+    # out before sending a request that would be billed.
+    signed_in, who = auth()
+    if signed_in is False:
+        return False, "not signed in - run  claude auth login"
     try:
         p = subprocess.run([exe, "-p", "--output-format", "json", "--model", name],
                            input="Reply with the single word: ok",
@@ -106,6 +138,13 @@ def check(name, timeout=180):
 
 
 def show(name):
+    ok, who = auth()
+    state = {True: "signed in", False: "SIGNED OUT", None: "unknown"}[ok]
+    print(f"account: {state} - {who}")
+    if ok is not True:
+        print("  run  claude auth login   (or  python model.py --login)")
+        print("  Only four steps need this; everything else runs without it.")
+    print()
     print(f"model: {name}" + ("   (default)" if name == DEFAULT else ""))
     print(f"  set in {CONFIG}" if os.path.exists(CONFIG) else "  no config.json yet")
     print()
@@ -123,8 +162,20 @@ def main():
     ap.add_argument("name", nargs="?", help="alias or full model id")
     ap.add_argument("--check", action="store_true",
                     help="send one trivial request to prove the model is accepted")
+    ap.add_argument("--login", action="store_true",
+                    help="sign the claude CLI in (hands over to `claude auth login`)")
     ap.add_argument("--clear", action="store_true", help="forget the setting")
     a = ap.parse_args()
+
+    if a.login:
+        exe = shutil.which("claude")
+        if not exe:
+            raise SystemExit(
+                "the claude CLI is not on PATH - install it from "
+                "claude.com/product/claude-code first.")
+        # Hand the terminal over: signing in opens a browser and asks questions,
+        # so this must not capture the streams.
+        raise SystemExit(subprocess.run([exe, "auth", "login"]).returncode)
 
     if a.clear:
         if os.path.exists(CONFIG):

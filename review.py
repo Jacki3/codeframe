@@ -226,8 +226,9 @@ def explain(env):
     msg = str(env.get("result") or env.get("terminal_reason") or "").strip()
     low = msg.lower()
     if "not logged in" in low or "/login" in low:
-        return ("the claude CLI is installed but not logged in.\n\n"
-                "    run  claude  on its own, then use  /login\n" + OFFLINE_NOTE)
+        return ("the claude CLI is installed but not signed in.\n\n"
+                "    claude auth login          (or  python model.py --login)\n"
+                "    claude auth status         to check it worked\n" + OFFLINE_NOTE)
     if "unrecognized_model" in low or "model" in low:
         return (f"the claude CLI would not accept that model:\n    {msg[:200]}\n\n"
                 "    run  python model.py  to see the names known to work.")
@@ -242,7 +243,7 @@ def ask(payload, model=None, timeout=600, task=None):
         raise SystemExit(
             "the claude CLI was not found on PATH.\n\n"
             "    install it from claude.com/product/claude-code,\n"
-            "    then run  claude  and use  /login\n" + OFFLINE_NOTE)
+            "    then run  claude auth login\n" + OFFLINE_NOTE)
     prompt = (task or TASK) + "\n\nINPUT\n" + json.dumps(payload, indent=1)
     p = subprocess.run(
         [exe, "-p", "--output-format", "json", "--model", model],

@@ -16,6 +16,41 @@ project belongs under git and every figure regenerates from the source.
 
 ---
 
+## Before you start
+
+Python 3.9 or newer, and `openpyxl` if your raw data is `.xlsx`. That is all most
+of this needs.
+
+Four steps can call a model — `setup_project.py --review`, `valence.py`,
+`findings.py --add`, and `findings.py --discussion --summarise`. Those need the
+[Claude Code CLI](https://claude.com/product/claude-code), signed in:
+
+```
+claude auth login
+```
+
+```
+claude auth status
+```
+
+There is no API key: the CLI signs in with your Claude account through a browser.
+To check the whole setup at once — signed in, which account, which model:
+
+```
+python model.py
+```
+
+```
+account: signed in - you@example.com (pro)
+
+model: sonnet   (default)
+```
+
+If you would rather not sign in at all, read *[If you have no Claude
+account](#if-you-have-no-claude-account)* below — nearly everything still works.
+
+---
+
 ## The three steps
 
 ### 1. Set up the project
@@ -198,13 +233,15 @@ anything: the mapping in `setup.json` is editable by hand, valence can come from
 The four that do ask will tell you what to do rather than failing obscurely:
 
 ```
-the claude CLI is installed but not logged in.
+the claude CLI is installed but not signed in.
 
-    run  claude  on its own, then use  /login
+    claude auth login          (or  python model.py --login)
+    claude auth status         to check it worked
 ```
 
-Install the CLI from [claude.com/product/claude-code](https://claude.com/product/claude-code).
-There is no API key to set — the CLI signs in with your account.
+`python model.py --login` hands the terminal over to `claude auth login`, which
+opens a browser. `python model.py` on its own reports whether you are signed in
+and as whom — that check runs locally, costs nothing, and sends nothing.
 
 ## Choosing the model
 
