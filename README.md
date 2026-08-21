@@ -366,6 +366,16 @@ itself. Everything is searchable, including the method notes — searching
 
 ## How the pages look
 
+The reader's choice follows them between pages two ways: it is stored in
+`localStorage`, and the nav links carry it as `?theme=`. The second matters more
+than it sounds — `localStorage` is per-origin, so opening the pages from a
+`file://` path or inside a preview pane can give each page its own empty store,
+and the choice would be forgotten on every click. A small script in `<head>`
+reads the URL first, then storage, and applies the theme before the page paints,
+so there is no flash of the default either.
+
+
+
 A project ships **several themes, not one**. Every page carries all of them plus a
 picker, so the reader chooses — and "Match my system" hands control back to their
 own light/dark setting. The choice is remembered per reader in `localStorage`.

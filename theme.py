@@ -481,8 +481,35 @@ def css_vars(project):
     return css
 
 
-def head_extra(project):
-    out = ""
+HEAD_JS = """
+(function(){try{
+  var k=%s, u=null;
+  try{u=new URLSearchParams(location.search).get('theme');}catch(e){}
+  var v=u;
+  if(!v){try{v=localStorage.getItem(k);}catch(e){}}
+  if(u){try{localStorage.setItem(k,u);}catch(e){}}
+  if(v&&v!=='system')document.documentElement.setAttribute('data-theme',v);
+}catch(e){}})();
+"""
+
+
+def head_script(key="codeframe-theme"):
+    """Apply the reader's theme before the page paints, and without storage.
+
+    Two problems, one script. In <head> it runs before anything is drawn, so the
+    page does not flash the default theme and then correct itself.
+
+    And it reads ?theme= before localStorage, because localStorage is per-origin:
+    open these pages from a file:// path or inside a preview pane and each one can
+    get its own empty store, so a choice made on the codebook is simply not there
+    when you reach the findings. The picker stamps the current theme onto the nav
+    links, so following one carries the choice whether storage works or not.
+    """
+    return f"<script>{HEAD_JS % json.dumps(key)}</script>"
+
+
+def head_extra(project, key="codeframe-theme"):
+    out = head_script(key)
     if project.get("favicon"):
         out += f'<link rel="icon" href="{project["favicon"]}">'
     if project.get("google_fonts"):
@@ -503,20 +530,32 @@ PICKER_CSS = """
 PICKER_JS = """
 (function(){
   var root=document.documentElement, KEY=%s,
-      host=root.getAttribute('data-theme'), sel=document.getElementById('theme');
+      sel=document.getElementById('theme');
   if(!sel) return;
+  // the head script has already applied the theme; start from what it decided
+  var current=root.getAttribute('data-theme')||'system';
+  function stamp(v){
+    // carry the choice on every in-site link, so it survives a missing or
+    // per-file localStorage - which is what happens over file://
+    [].slice.call(document.querySelectorAll('nav a[href]')).forEach(function(a){
+      var h=a.getAttribute('href').split('?')[0];
+      a.setAttribute('href', (v&&v!=='system')
+        ? h+'?theme='+encodeURIComponent(v) : h);
+    });
+  }
   function set(v){
     if(v&&v!=='system'){root.setAttribute('data-theme',v);}
-    else if(host){root.setAttribute('data-theme',host);}
     else{root.removeAttribute('data-theme');}
+    try{localStorage.setItem(KEY,v);}catch(e){}
+    stamp(v);
   }
-  var saved=null;
-  try{saved=localStorage.getItem(KEY);}catch(e){}
-  if(saved){sel.value=saved;set(saved);}
-  sel.addEventListener('change',function(){
-    set(sel.value);
-    try{localStorage.setItem(KEY,sel.value);}catch(e){}
-  });
+  sel.value=current;
+  // the picker sits above the nav, so at parse time the links do not exist yet;
+  // stamp them once the document is complete or the first click loses the theme
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){stamp(current);});
+  } else { stamp(current); }
+  sel.addEventListener('change',function(){set(sel.value);});
 })();
 """
 
