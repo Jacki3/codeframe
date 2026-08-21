@@ -37,7 +37,7 @@ Every theme in the project is checked before anything is written: contrast for
 text and marks, and pos-against-neg under deuteranopia. A theme that fails is
 reported and not written unless you pass --force.
 """
-import argparse, base64, json, math, os, re, sys
+import argparse, base64, collections, json, math, os, re, sys
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -232,6 +232,112 @@ def validate(project):
         bad += b
         notes += n
     return bad, notes
+
+
+# ---------------------------------------------------------------- measuring
+
+def _get(url, timeout=20, cap=900_000):
+    import urllib.request
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (compatible; codeframe theme matcher)"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read(cap).decode("utf-8", errors="replace")
+
+
+LINK_TAG = re.compile(r"<link[^>]+>", re.I)
+IS_SHEET = re.compile(r"rel\s*=\s*[\"']?stylesheet", re.I)
+HREF = re.compile(r"href\s*=\s*[\"']([^\"']+)", re.I)
+STYLE_TAG = re.compile(r"<style[^>]*>(.*?)</style>", re.S | re.I)
+HEXLIT = re.compile(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b")
+RGBLIT = re.compile(r"rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)")
+FONTDECL = re.compile(r"font-family\s*:\s*([^;}]+)", re.I)
+RADIUSDECL = re.compile(r"border-radius\s*:\s*([^;}]+)", re.I)
+
+
+def measure_site(url, max_sheets=8):
+    """Read a site's own stylesheets and count what it actually uses.
+
+    A model asked to match a site it cannot see returns a plausible palette
+    rather than the real one. Asked to match this project's own case-study page
+    it produced a blue accent for a site that uses olive, an almost-black ink for
+    a site whose text is forest green, and named two typefaces the site does not
+    load - and said in its own reasoning that the stylesheet was not reachable.
+
+    The colours are sitting in the CSS. Fetching and counting them is cheap and
+    exact, so the model is handed measurements and left to do the part it is good
+    at, which is deciding which measured colour should play which role.
+    """
+    from urllib.parse import urljoin
+    html = _get(url)
+    sheets = []
+    for tag in LINK_TAG.findall(html):
+        if IS_SHEET.search(tag):
+            m = HREF.search(tag)
+            if m:
+                sheets.append(urljoin(url, m.group(1)))
+    css = "\n".join(STYLE_TAG.findall(html))
+    read = 0
+    for href in sheets[:max_sheets]:
+        try:
+            css += "\n" + _get(href)
+            read += 1
+        except Exception:
+            continue
+
+    colours = collections.Counter()
+    for m in HEXLIT.finditer(css):
+        rgb = parse_hex(m.group(1))
+        if rgb:
+            colours[to_hex(rgb)] += 1
+    for m in RGBLIT.finditer(css):
+        vals = [int(v) for v in m.groups()]
+        if all(v <= 255 for v in vals):
+            colours[to_hex(tuple(v / 255 for v in vals))] += 1
+
+    # Which selector a family is declared on decides whether it is the body face
+    # or the heading face, and a bare count cannot tell them apart - on this
+    # project's own site Barlow is declared fewer times than it is used, and a
+    # count alone got body and display the wrong way round.
+    fonts, where = collections.Counter(), {}
+    for m in FONTDECL.finditer(css):
+        first = m.group(1).split(",")[0].strip().strip("\"'")
+        if not first or first.startswith(("var(", "inherit", "initial", "unset")):
+            continue
+        fonts[first] += 1
+        head = css[max(0, m.start() - 160):m.start()]
+        sel = head.rsplit("}", 1)[-1].rsplit("{", 1)[0].strip()
+        sel = re.sub(r"\s+", " ", sel)[-70:]
+        if sel:
+            where.setdefault(first, [])
+            if sel not in where[first] and len(where[first]) < 4:
+                where[first].append(sel)
+
+    # Modern sites name their faces in custom properties - --global-body-font-family,
+    # --heading-font, --font-sans - and that says outright which is body and which
+    # is display, where a declaration count only guesses.
+    named = {}
+    for m in re.finditer(r"--([a-z0-9-]*(?:font|type)[a-z0-9-]*)\s*:\s*([^;}]+)",
+                         css, re.I):
+        key, val = m.group(1).lower(), m.group(2).strip().strip("\"'")
+        # a family, not a size or a weight: starts with a name and carries no
+        # lengths or calc, which is what --*-font-size is full of
+        if (not val or val.startswith("var(") or val[0].isdigit()
+                or re.search(r"clamp\(|calc\(|[0-9](px|rem|em)\b|^\d", val)
+                or not re.match(r"[A-Za-z\"']", val)):
+            continue
+        named.setdefault(key, val[:90])
+
+    radii = collections.Counter(m.group(1).strip()[:16]
+                                for m in RADIUSDECL.finditer(css))
+    return {"url": url, "stylesheets_read": read, "css_bytes": len(css),
+            "colours_by_frequency": [{"hex": h, "uses": n}
+                                     for h, n in colours.most_common(24)],
+            "fonts_by_frequency": [{"family": f, "uses": n,
+                                    "declared_on": where.get(f, [])}
+                                   for f, n in fonts.most_common(8)],
+            "font_variables_declared_by_the_site": named,
+            "radius_by_frequency": [{"value": v, "uses": n}
+                                    for v, n in radii.most_common(5)]}
 
 
 # ------------------------------------------------------------------ storage
@@ -450,9 +556,28 @@ def from_source(source, model):
         tools = ["Read"]
     elif kind == "url":
         payload["url"] = source
-        payload["instruction"] = (f"Fetch {source} and take the palette and "
-                                  "typography from that page.")
-        tools = ["WebFetch"]
+        try:
+            m = measure_site(source)
+        except Exception as e:
+            raise SystemExit(
+                f"could not read {source}: {e}\n"
+                "  If the site is behind a login, save a screenshot and use\n"
+                "  --from that-image.png instead.")
+        payload["measured"] = m
+        payload["instruction"] = (
+            "These are the colours, typefaces and corner radii counted in that "
+            "site's own stylesheets, most-used first. Use THESE - do not invent a "
+            "palette and do not fetch the page. Decide which measured colour plays "
+            "which role, and derive only the tokens the site has no colour for. "
+            "Name the font stacks after the families measured, with fallbacks.")
+        print(f"  read {m['stylesheets_read']} stylesheet(s), "
+              f"{m['css_bytes']:,} bytes of CSS")
+        if m["colours_by_frequency"]:
+            print("  most-used colours: " + " ".join(
+                c["hex"] for c in m["colours_by_frequency"][:6]))
+        if m["fonts_by_frequency"]:
+            print("  typefaces: " + ", ".join(
+                f["family"] for f in m["fonts_by_frequency"][:4]))
     else:
         cols = [c.strip() for c in re.split(r"[,\s]+", source) if c.strip()]
         bad = [c for c in cols if not parse_hex(c)]
