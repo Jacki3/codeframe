@@ -169,6 +169,30 @@ evidence came from).
 `--add` turns a request in words into a spec. It never returns a number and never
 sees a quote.
 
+**The discussion page has two halves, and they come from different places.**
+
+*About the study* comes from `codebook/notes.csv`, which you keep by hand — notes
+about method rather than about any code. That the survey caught the moment and the
+interview caught the reflection; that the weather was cold; that a column in the
+raw export is wrong for nine people; that something you looked for was not there.
+`notes_template.csv` shows the shape:
+
+```
+note_id, category, title, note, evidence
+```
+
+`category` is yours to invent — Instrument, Confound, Design, Attribution, Null
+result, Source data, Coverage all earn their keep. `evidence` is optional and may
+name a `source_id` or an `excerpt_id`; a third of these notes have no single
+passage behind them, which is the point of keeping them separately.
+
+These are shown **as written and never summarised**. They are already your prose,
+and a model rewriting them could only add drift.
+
+*By lens* comes from the `note` column beside each coding, grouped by the lens of
+the code it sits on. `--summarise` writes one paragraph per lens from those, and
+is most useful where it catches two notes disagreeing.
+
 ---
 
 ## The denominator

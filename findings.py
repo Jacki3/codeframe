@@ -572,7 +572,79 @@ def gather_notes(D):
     return out
 
 
-def discussion_page(D, notes, summaries):
+def standing_notes(root, D):
+    """Notes about the study rather than about a code.
+
+    codebook/notes.csv, if you keep one. A coding note is tied to a passage and
+    answers "what is going on here"; these answer "what should a reader know
+    before believing any of it" - that the survey caught the moment and the
+    interview caught the reflection, that the weather was cold, that a column in
+    the raw export is wrong for nine people, that a null result is a real result.
+
+    They are the half of a discussion that has no code to hang from, and without
+    somewhere to put them they get written in a notebook and lost. Four of the
+    twelve that prompted this cite no evidence at all, which is why evidence is
+    optional here.
+
+        note_id, category, title, note, evidence
+
+    evidence is optional and may name an excerpt or a source; anything else is
+    shown as written.
+    """
+    rows = _read(os.path.join(root, "codebook", "notes.csv"))
+    if not rows:
+        return []
+    srcs = {s["source_id"]: s for s in _read(os.path.join(root, "sources.csv"))}
+    out = []
+    for r in rows:
+        ev = (r.get("evidence") or r.get("evidence_segment_id") or "").strip()
+        quote = where = ""
+        x = D["excerpts"].get(ev)
+        if x:
+            quote, where = (x.get("text") or "").strip(), f'PID{x.get("pid", "?")}'
+        elif ev in srcs:
+            s = srcs[ev]
+            quote = (s.get("text") or "").strip()[:400]
+            where = f'PID{s.get("pid", "?")} · {s.get("label", "")}'.strip(" ·")
+        out.append({"id": (r.get("note_id") or "").strip(),
+                    "category": (r.get("category") or "Uncategorised").strip(),
+                    "title": (r.get("title") or "").strip(),
+                    "note": (r.get("note") or "").strip(),
+                    "evidence": ev, "quote": quote, "where": where})
+    return out
+
+
+def draw_standing(notes):
+    if not notes:
+        return ""
+    by_cat = collections.defaultdict(list)
+    for n in notes:
+        by_cat[n["category"]].append(n)
+    H = ['<h2>About the study</h2>',
+         f'<p class="sub" style="margin:6px 0 0">{len(notes)} notes in '
+         f'{len(by_cat)} categories, shown as written. These are about method, '
+         f'not about any one code, and they frame how to read everything below.</p>']
+    for cat in sorted(by_cat):
+        H.append(f'<figure class="fig"><h3>{esc(cat)}</h3>')
+        for n in by_cat[cat]:
+            H.append('<p class="note">'
+                     + (f'<span class="tag">{esc(n["id"])}</span> ' if n["id"] else "")
+                     + f'<b>{esc(n["title"])}</b></p>')
+            if n["note"]:
+                H.append(f'<p class="note" style="color:var(--ink-2)">'
+                         f'{esc(n["note"])}</p>')
+            if n["quote"]:
+                H.append(f'<blockquote class="q">{esc(n["quote"][:400])}'
+                         f'{"&hellip;" if len(n["quote"]) > 400 else ""}'
+                         f'<cite>{esc(n["where"] or n["evidence"])}</cite></blockquote>')
+            elif n["evidence"]:
+                H.append(f'<p class="sub" style="margin:2px 0 10px">evidence: '
+                         f'{esc(n["evidence"])} — not found in this project</p>')
+        H.append('</figure>')
+    return "".join(H)
+
+
+def discussion_page(D, notes, summaries, standing=()):
     by_lens = collections.defaultdict(list)
     for cid in sorted(notes, key=lambda c: -len(D["plays"].get(c, ()))):
         by_lens[(D["codes"].get(cid) or {}).get("lens") or "Uncategorised"].append(cid)
@@ -582,11 +654,15 @@ def discussion_page(D, notes, summaries):
          '<meta name="viewport" content="width=device-width,initial-scale=1">',
          f'<title>Discussion</title><style>{CSS}</style></head><body><div class="wrap">',
          '<h1>Discussion</h1>',
-         f'<p class="sub">{total} notes across {len(notes)} codes, '
-         f'grouped by lens. Each note is shown with the passage it was written '
-         f'against.</p>',
+         f'<p class="sub">'
+         + (f'{len(standing)} notes about the study &middot; ' if standing else '')
+         + f'{total} coding notes across {len(notes)} codes</p>',
          '<nav><a href="findings.html">Findings</a>'
-         '<a href="discussion.html">Discussion</a></nav>']
+         '<a href="discussion.html">Discussion</a></nav>',
+         draw_standing(standing),
+         ('<h2>By lens</h2><p class="sub" style="margin:6px 0 0">Notes written '
+          'beside a coding, grouped by the lens of the code they sit on. Each is '
+          'shown with the passage it was written against.</p>' if total else '')]
     if not total:
         H.append('<p class="empty">No notes yet. Add a note beside a coding in your '
                  'sheet and re-run.</p>')
@@ -657,7 +733,20 @@ def summarise(D, notes, lens_of, model):
 def cmd_discussion(root, do_summarise, model):
     D = load(root)
     notes = gather_notes(D)
-    print(f"notes    : {sum(len(v) for v in notes.values())} across {len(notes)} codes")
+    standing = standing_notes(root, D)
+    print(f"notes    : {sum(len(v) for v in notes.values())} coding notes "
+          f"across {len(notes)} codes")
+    if standing:
+        cats = sorted({n["category"] for n in standing})
+        print(f"           {len(standing)} about the study: {', '.join(cats)}")
+        missing = [n["id"] or n["title"][:28] for n in standing
+                   if n["evidence"] and not n["quote"]]
+        if missing:
+            print(f"           {len(missing)} cite evidence not in this project: "
+                  + ", ".join(missing[:4]))
+    else:
+        print("           no codebook/notes.csv - see the header of that file's "
+              "template for what it is for")
     summaries = {}
     if do_summarise and notes:
         print(f"\nsending your notes to {model} - the notes only, not the passages")
@@ -667,7 +756,7 @@ def cmd_discussion(root, do_summarise, model):
     elif do_summarise:
         print("nothing to summarise.")
     p = os.path.join(out_dir(root), "discussion.html")
-    write(p, discussion_page(D, notes, summaries))
+    write(p, discussion_page(D, notes, summaries, standing))
     print(f"\nwrote {p}")
     if not do_summarise:
         print("Pass --summarise to add a generated paragraph per lens.")

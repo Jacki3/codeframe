@@ -1,0 +1,5 @@
+note_id,category,title,note,evidence
+N01,Instrument,"What the instrument caught, and what it missed",Something about how the data was collected that changes how to read it. Copy this file to <project>/codebook/notes.csv.,
+N02,Confound,Something outside the study that may explain a result,"Weather, order, fatigue, a room. Name it even when you cannot measure it.",
+N03,Source data,A fault in the raw data itself,"A wrong column, a duplicate submission, an unreliable transcription. Evidence may name a source_id or excerpt_id, or be left blank.",
+N04,Null result,Something you looked for and did not find,"A null result is a result, and it is the one most often lost.",
