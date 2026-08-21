@@ -152,6 +152,7 @@ excerpts highlighted, and for coding the odd passage in place.
 
 ```
 python findings.py --data ../myproject --generate
+python findings.py --data ../myproject --codebook
 python findings.py --data ../myproject --discussion --summarise
 python findings.py --data ../myproject --add "differences between the two conditions for the top ten codes"
 ```
@@ -168,6 +169,19 @@ evidence came from).
 
 `--add` turns a request in words into a spec. It never returns a number and never
 sees a quote.
+
+**The codebook page** is `--codebook`: every code under its lens, with its
+definition, include and exclude rules, prevalence, valence spread, and one passage
+showing what it means. Code ids mentioned in an exclude rule become links, since
+those rules are mostly cross-references and following them by hand is how a
+codebook stops being read.
+
+The example passage comes from the `anchor` column of `codes.csv` if you put an
+`excerpt_id` there. If you do not, one is chosen — preferring a coding you
+annotated, then the one closest to the median length for that code, because the
+shortest is usually a fragment and the longest is usually somebody rambling. An
+auto-chosen quote is labelled as such, so a pinned example is never mistaken for a
+lucky one.
 
 **The discussion page has two halves, and they come from different places.**
 

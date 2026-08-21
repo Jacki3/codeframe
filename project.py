@@ -21,7 +21,7 @@ import csv, json, os, re
 
 VALENCE = ("pos", "neg", "mixed", "neutral")
 CODE_FIELDS = ["code_id", "lens", "name", "definition", "valence",
-               "include", "exclude", "note"]
+               "include", "exclude", "anchor", "note"]
 EXCERPT_FIELDS = ["excerpt_id", "source_id", "start", "end", "text"]
 CODING_FIELDS = ["excerpt_id", "code_id", "valence", "coder", "note"]
 

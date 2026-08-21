@@ -364,6 +364,11 @@ td.code{font-family:var(--mono);font-size:11px;color:var(--ink-2);white-space:no
 """
 
 
+NAV = ('<nav><a href="findings.html">Findings</a>'
+       '<a href="codebook.html">Codebook</a>'
+       '<a href="discussion.html">Discussion</a></nav>')
+
+
 def esc(s):
     return (str(s).replace("&", "&amp;").replace("<", "&lt;")
             .replace(">", "&gt;").replace('"', "&quot;"))
@@ -495,8 +500,7 @@ def page(D, specs, results, title="Findings"):
          f'{len(D["codes"])} codes &middot; {n_x} excerpts &middot; {n_cod} codings<br>'
          f'{touched} of {len(D["keys"])} {D["units"]} have at least one coding'
          f'</p>',
-         '<nav><a href="findings.html">Findings</a>'
-         '<a href="discussion.html">Discussion</a></nav>']
+         NAV]
     for spec, res in zip(specs, results):
         H.append(draw(D, spec, res))
     H.append('</div></body></html>')
@@ -570,6 +574,103 @@ def gather_notes(D):
                      + (f' &middot; {x["game"]}' if x.get("game") else "")
                      + (f' &middot; {x["kind"]}' if x.get("kind") else "")})
     return out
+
+
+CODE_REF = re.compile(r"\b[A-Z]{2,6}-[A-Z0-9][A-Z0-9-]*\b")
+
+
+def linkify(text, known):
+    """Turn a code id mentioned in an include/exclude rule into a link to it.
+
+    Exclusion rules are mostly cross-references - "use PER-FACTUAL for what was
+    learned" - and following them by hand across forty codes is how a codebook
+    stops being read.
+    """
+    def sub(m):
+        cid = m.group(0)
+        return (f'<a href="#{esc(cid)}">{esc(cid)}</a>' if cid in known else esc(cid))
+    out, last = [], 0
+    for m in CODE_REF.finditer(text):
+        out.append(esc(text[last:m.start()])); out.append(sub(m)); last = m.end()
+    out.append(esc(text[last:]))
+    return "".join(out)
+
+
+def anchor_for(D, cid):
+    """The passage that shows what this code means.
+
+    Uses codes.csv "anchor" when set. Otherwise picks one, preferring a coding the
+    coder bothered to annotate and then the one closest to the median length for
+    that code - the shortest is usually a fragment and the longest is usually
+    somebody rambling, and neither reads as a definition.
+    """
+    declared = ((D["codes"].get(cid) or {}).get("anchor") or "").strip()
+    if declared and declared in D["excerpts"]:
+        return D["excerpts"][declared], True
+    pool = [(c, x) for c, x in D["by_code"].get(cid, [])
+            if (x.get("text") or "").strip()]
+    if not pool:
+        return None, False
+    noted = [p for p in pool if (p[0].get("note") or "").strip()]
+    pool = noted or pool
+    mid = statistics.median([len(x["text"]) for _, x in pool])
+    return min(pool, key=lambda p: abs(len(p[1]["text"]) - mid))[1], False
+
+
+def codebook_page(D):
+    known = set(D["codes"])
+    n = len(D["keys"])
+    by_lens = collections.defaultdict(list)
+    for cid in sorted(D["codes"], key=lambda c: (-len(D["plays"].get(c, ())), c)):
+        by_lens[(D["codes"][cid].get("lens") or "").strip() or "Uncategorised"].append(cid)
+
+    H = ['<!doctype html><html lang="en"><head><meta charset="utf-8">',
+         '<meta name="viewport" content="width=device-width,initial-scale=1">',
+         f'<title>Codebook</title><style>{CSS}</style></head><body><div class="wrap">',
+         '<h1>Codebook</h1>',
+         f'<p class="sub">{len(D["codes"])} codes in {len(by_lens)} lenses &middot; '
+         f'prevalence is the share of {n} {D["units"]} carrying the code</p>',
+         NAV,
+         '<p class="key" style="margin-bottom:18px">' + " ".join(
+             f'<a href="#{esc(L)}">{esc(L)}</a> <span style="color:var(--ink-3)">'
+             f'{len(cs)}</span>' for L, cs in sorted(by_lens.items())) + '</p>']
+
+    for lens in sorted(by_lens):
+        H.append(f'<h2 id="{esc(lens)}">{esc(lens)} '
+                 f'<span class="num">{len(by_lens[lens])} '
+                 f'code{"s" if len(by_lens[lens]) != 1 else ""}</span></h2>')
+        for cid in by_lens[lens]:
+            c = D["codes"][cid]
+            hits = len(D["plays"].get(cid, ()))
+            spread = collections.Counter(cd["valence"] for cd, _ in D["by_code"].get(cid, []))
+            x, pinned = anchor_for(D, cid)
+            H.append(f'<figure class="fig" id="{esc(cid)}">'
+                     f'<h3>{esc(cid)} <span class="num" style="float:right">'
+                     f'{round(100*hits/n, 1) if n else 0}%</span></h3>'
+                     f'<p class="sub" style="margin:2px 0 10px">{esc(c.get("name", ""))}'
+                     f' &middot; {hits} of {n} {D["units"]}'
+                     + (f' &middot; declared {esc(c["valence"])}' if c.get("valence") else "")
+                     + (' &middot; ' + ", ".join(f"{k or 'unjudged'} {v}"
+                                                 for k, v in spread.most_common())
+                        if spread else "") + '</p>')
+            if c.get("definition"):
+                H.append(f'<p class="note">{esc(c["definition"])}</p>')
+            for field in ("include", "exclude"):
+                if (c.get(field) or "").strip():
+                    H.append(f'<p class="note"><span class="tag">{field}</span> '
+                             f'{linkify(c[field].strip(), known)}</p>')
+            if x:
+                where = " &middot; ".join(filter(None, [
+                    f'PID{x.get("pid", "?")}', x.get("game") or x.get("unit") or "",
+                    x.get("kind", ""), "" if pinned else "auto-chosen"]))
+                H.append(f'<blockquote class="q">{esc(x["text"][:600])}'
+                         f'{"&hellip;" if len(x["text"]) > 600 else ""}'
+                         f'<cite>{where}</cite></blockquote>')
+            elif hits == 0:
+                H.append('<p class="empty">Nothing coded to this yet.</p>')
+            H.append('</figure>')
+    H.append('</div></body></html>')
+    return "".join(H)
 
 
 def standing_notes(root, D):
@@ -657,8 +758,7 @@ def discussion_page(D, notes, summaries, standing=()):
          f'<p class="sub">'
          + (f'{len(standing)} notes about the study &middot; ' if standing else '')
          + f'{total} coding notes across {len(notes)} codes</p>',
-         '<nav><a href="findings.html">Findings</a>'
-         '<a href="discussion.html">Discussion</a></nav>',
+         NAV,
          draw_standing(standing),
          ('<h2>By lens</h2><p class="sub" style="margin:6px 0 0">Notes written '
           'beside a coding, grouped by the lens of the code they sit on. Each is '
@@ -728,6 +828,22 @@ def summarise(D, notes, lens_of, model):
     if cost:
         print(f"  cost: ${cost:.2f}")
     return out
+
+
+def cmd_codebook(root):
+    D = load(root)
+    p = os.path.join(out_dir(root), "codebook.html")
+    write(p, codebook_page(D))
+    pinned = sum(1 for cid in D["codes"] if anchor_for(D, cid)[1])
+    empty = [cid for cid in D["codes"] if not D["plays"].get(cid)]
+    print(f"wrote {p}")
+    print(f"  {len(D['codes'])} codes, {pinned} with a pinned anchor, "
+          f"{len(D['codes']) - pinned} auto-chosen")
+    if empty:
+        print(f"  {len(empty)} with nothing coded to them: "
+              + ", ".join(empty[:6]) + (" ..." if len(empty) > 6 else ""))
+    print('  Pin a better example by putting an excerpt_id in the "anchor" '
+          "column of codes.csv.")
 
 
 def cmd_discussion(root, do_summarise, model):
@@ -855,6 +971,7 @@ def main():
     ap = argparse.ArgumentParser(description="Build findings from a coded corpus.")
     ap.add_argument("--data", required=True)
     ap.add_argument("--generate", action="store_true", help="build the default findings")
+    ap.add_argument("--codebook", action="store_true", help="build the codebook page")
     ap.add_argument("--discussion", action="store_true", help="build the discussion page")
     ap.add_argument("--summarise", action="store_true",
                     help="with --discussion: add a generated paragraph per lens")
@@ -866,12 +983,14 @@ def main():
     a.model = a.model or current()
     if a.add:
         cmd_add(a.data, a.add, a.model)
+    elif a.codebook:
+        cmd_codebook(a.data)
     elif a.discussion:
         cmd_discussion(a.data, a.summarise, a.model)
     elif a.generate:
         cmd_generate(a.data)
     else:
-        ap.error("give --generate, --discussion, or --add")
+        ap.error("give --generate, --codebook, --discussion, or --add")
 
 
 if __name__ == "__main__":
