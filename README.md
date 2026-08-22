@@ -11,6 +11,8 @@ your findings, and your discussion notes.
 Standard library only. Every artefact is a CSV or a small JSON file, so the whole
 project belongs under version control and every figure regenerates from source.
 
+MIT licensed. Python 3.9+.
+
 ```bash
 python setup_project.py --raw ../raw --to ../myproject --apply
 ```
@@ -426,6 +428,13 @@ how the frame evolved, which is worth having when the methods section asks.
 `sources.csv` holds the full text of everything you imported, and the generated
 pages quote from it. Treat the project directory with the same care as the raw
 data, and read `--dry-run` output before using any step that sends.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). Use it, change it, publish what you make with it.
+
+If it is useful in published work, a citation of the repository is welcome but
+not required.
 
 ## Not yet
 
