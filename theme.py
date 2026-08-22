@@ -72,7 +72,7 @@ SHADOW = {
 # The four the pages ship with. "scheme" tells the browser which system setting
 # this theme belongs to, and which one "Match my system" falls back to.
 BUILTIN = {
- "light": {"label": "Sarsen", "scheme": "light", "shadow": SHADOW["light"], "tokens": {
+ "light": {"label": "Light", "scheme": "light", "shadow": SHADOW["light"], "tokens": {
     "ground": "#F2F2EF", "surface": "#FFFFFF", "surface-2": "#F8F8F5",
     "ink": "#22212A", "ink-2": "#56545F", "ink-3": "#86848F",
     "rule": "#E0DFDA", "rule-soft": "#EBEAE6",
@@ -84,7 +84,7 @@ BUILTIN = {
     "series-a": "#86848F", "series-b": "#7A4A7E",
     "mark": "#EDE8B8", "mark-ink": "#3F3A12", "warn": "#8A4B42"}},
 
- "dark": {"label": "Sarsen dark", "scheme": "dark", "shadow": SHADOW["dark"], "tokens": {
+ "dark": {"label": "Dark", "scheme": "dark", "shadow": SHADOW["dark"], "tokens": {
     "ground": "#17171B", "surface": "#1F1F25", "surface-2": "#25252C",
     "ink": "#EDECEE", "ink-2": "#A9A7B2", "ink-3": "#8E8C98",
     "rule": "#31313A", "rule-soft": "#292930",
@@ -96,7 +96,7 @@ BUILTIN = {
     "series-a": "#9A98A3", "series-b": "#B98BBE",
     "mark": "#4A431C", "mark-ink": "#F0E9BE", "warn": "#CC9186"}},
 
- "chalk": {"label": "Chalk - high contrast", "scheme": "light",
+ "chalk": {"label": "High contrast", "scheme": "light",
            "shadow": SHADOW["none"],
            # square corners, a heavier rule and one plain face throughout: the
            # point of this theme is that nothing is soft or decorative
@@ -464,7 +464,7 @@ def css_vars(project):
 
     The dark block is guarded with :root:not([data-theme]) so a reader's explicit
     choice is not overridden by their system setting - the picker has to win in
-    both directions or "Sarsen" is unusable on a machine set to dark.
+    both directions or a light theme is unusable on a machine set to dark.
     """
     themes = project.get("themes") or BUILTIN
     dflt = project.get("default") if project.get("default") in themes else next(iter(themes))

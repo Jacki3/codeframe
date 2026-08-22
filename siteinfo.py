@@ -27,7 +27,7 @@ FIELDS = ["title", "version", "project", "description", "authors", "footer"]
 
 
 def default_title(root):
-    """A folder called 'avebury-2024' becomes 'Avebury 2024'."""
+    """A folder called 'reading-study-2024' becomes 'Reading study 2024'."""
     name = os.path.basename(os.path.abspath(root).rstrip("\\/"))
     name = re.sub(r"[-_]+", " ", name).strip()
     return name[:1].upper() + name[1:] if name else "Untitled project"

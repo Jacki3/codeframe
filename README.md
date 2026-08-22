@@ -1,337 +1,405 @@
 # codeframe
 
-Qualitative coding in plain CSV files, with the provenance filed for you.
+**Qualitative coding in plain CSV files, with the provenance filed for you.**
 
-You read the material, copy whatever passages matter into a spreadsheet, and write
-the code and any note beside each one. The tool works out where each quote came
-from — which participant, which unit, which question or timestamp — so none of
-that has to be recorded by hand, and it computes prevalence over a denominator
-that means something.
+You read your material, copy whatever passages matter into a spreadsheet, and
+write the code and any note beside each one. codeframe works out where each quote
+came from — which participant, which unit, which question or timestamp — so none
+of that has to be recorded by hand. Then it builds a small website: your codebook,
+your findings, and your discussion notes.
 
-Nothing is segmented in advance. Choosing a passage is what creates an excerpt, so
-the coded corpus and the codebook grow together.
+Standard library only. Every artefact is a CSV or a small JSON file, so the whole
+project belongs under version control and every figure regenerates from source.
 
-Standard library only. Everything is a CSV or a small JSON file, so the whole
-project belongs under git and every figure regenerates from the source.
-
----
-
-## What is here
-
-| | |
-|---|---|
-| `setup_project.py` | profile raw data, propose a mapping, build the project |
-| `review.py` | the optional model check of that mapping, and the only place a request is sent |
-| `file_codings.py` | file a coding spreadsheet against the corpus |
-| `valence.py` | settle valences left blank |
-| `project.py` | project state, shared by the tools |
-| `serve.py` | the browser coding tool |
-| `findings.py` | build the findings, codebook and discussion pages |
-| `siteinfo.py` | what the site calls itself |
-| `theme.py` | the themes it ships with |
-| `model.py` | which model the model-backed steps use |
-
-## Before you start
-
-Python 3.9 or newer, and `openpyxl` if your raw data is `.xlsx`. That is all most
-of this needs.
-
-Four steps can call a model — `setup_project.py --review`, `valence.py`,
-`findings.py --add`, and `findings.py --discussion --summarise`. Those need the
-[Claude Code CLI](https://claude.com/product/claude-code), signed in:
-
-```
-claude auth login
+```bash
+python setup_project.py --raw ../raw --to ../myproject --apply
 ```
 
-```
-claude auth status
-```
-
-There is no API key: the CLI signs in with your Claude account through a browser.
-To check the whole setup at once — signed in, which account, which model:
-
-```
-python model.py
+```bash
+python file_codings.py --data ../myproject --sheet coding.csv --apply
 ```
 
-```
-account: signed in - you@example.com (pro)
-
-model: sonnet   (default)
-```
-
-If you would rather not sign in at all, read *[If you have no Claude
-account](#if-you-have-no-claude-account)* below — nearly everything still works.
-
----
-
-## Every command
-
-Nine scripts. Only `--from`, `--review`, `--add`, `--summarise` and `valence.py`
-ever call a model; everything else runs on your machine alone.
-
-**Setting up** — `setup_project.py`
-
-```
-python setup_project.py --raw ../raw --to ../myproject [--skip folder,folder]
-python setup_project.py --to ../myproject --review [--dry-run] [--model NAME]
-python setup_project.py --to ../myproject --apply [--allow-rename]
-```
-
-**Coding** — `file_codings.py`, `valence.py`, `serve.py`
-
-```
-python file_codings.py --data ../myproject --sheet coding.csv [--apply] [--allow-new-codes] [--coder NAME]
-python valence.py --data ../myproject [--dry-run | --offline] [--apply] [--batch N]
-python serve.py --data ../myproject [--port N] [--read-only] [--no-open] [--coder NAME]
-```
-
-**Building the site** — `findings.py`
-
-```
+```bash
 python findings.py --data ../myproject --generate
-python findings.py --data ../myproject --codebook
-python findings.py --data ../myproject --discussion [--summarise]
-python findings.py --data ../myproject --add "a request in words"
 ```
 
-**Any of those four writes all three pages.** They share a masthead, a nav, a
-theme and a figures strip, so a change to any of those changes all three —
-updating a heading should not be a three-command job. The flag chooses what to
-*recompute*, not what to write. Generated summaries are cached in
-`findings/summaries.json`, so a rebuild never drops paragraphs you paid for.
+---
 
-**Appearance and identity** — `siteinfo.py`, `theme.py`, `model.py`
+## Two ideas worth knowing before you start
 
-```
-python siteinfo.py --data ../myproject --init
-python siteinfo.py --data ../myproject --title T --version V --project P --description D --authors "A, B" --footer F
-python theme.py --data ../myproject [--list] [--default NAME] [--drop NAME] [--reset]
-python theme.py --data ../myproject --from SOURCE [--name NAME] [--force]
-python theme.py --data ../myproject --favicon logo.png
-python model.py [NAME] [--check] [--login] [--clear]
-```
+**Nothing is segmented in advance.** Choosing a passage is what creates an
+excerpt, so the coded corpus and the codebook grow together. You do not decide in
+advance what the units of analysis are.
 
-After any of those, rebuild with `findings.py --generate` to see the change.
+**Rates are over a frame, not over what you happened to code.** `frame.csv` holds
+one row per (participant, unit) — a game played, a session attended, a site
+visited. Those rows exist whether or not anything has been coded, so *"31% of
+visits"* means 31% of the study rather than 31% of your coding. That is what lets
+prevalence stay meaningful while segmentation stays emergent.
+
+A source belonging to no single unit — an interview covering a whole session, say
+— is read, quoted and coded like any other, but counted against the participant
+rather than a unit. The reports say so rather than quietly dropping it.
+
+---
+
+## Requirements
+
+- **Python 3.9+**
+- **`openpyxl`**, only if your raw data is `.xlsx`
+- **[Claude Code CLI](https://claude.com/product/claude-code)**, only for the four
+  optional steps that use a model
+
+Nothing else. No API key, no database, no build step.
 
 ---
 
 ## The three steps
 
-### 1. Set up the project
+### 1 · Set up the project
 
-```
+```bash
 python setup_project.py --raw ../raw --to ../myproject
 ```
 
 Reads whatever is in the raw folder — spreadsheets, CSVs, transcripts — profiles
-every column, and writes `setup.json`: a proposed mapping saying which column is
-the participant id, which says what each response is *about*, which hold the text
-to code, which are categories to compare across, and which are numeric measures.
-Every proposal carries the evidence it was made from. Nothing else is written.
+every column, and writes `setup.json`: a proposed mapping saying which column
+identifies the participant, which says what each response is *about*, which hold
+the text to code, which are categories to compare across, and which are numeric
+measures. Every proposal carries the evidence behind it. Nothing else is written.
 
 `setup.json` is meant to be edited. The machine is good at finding candidates and
 bad at knowing which of two plausible columns you meant.
 
-Optionally, have a model check it first:
+Optionally, have a model check it:
 
-```
-python setup_project.py --to ../myproject --review --dry-run
+```bash
 python setup_project.py --to ../myproject --review
 ```
 
-Worth running for the two jobs the heuristics genuinely cannot do: telling a
-rating scale from a category when both are small integers, and naming a column,
-since a survey export writes the whole question into the header and that string
-becomes a column name and a label on every finding.
+Worth running for the two jobs heuristics genuinely cannot do — telling a rating
+scale from a category when both are small integers, and naming a column, since a
+survey export writes the whole question into the header and that string becomes a
+column name and a label on every finding. Add `--dry-run` to see exactly what
+would be sent first.
 
 Then build:
 
-```
+```bash
 python setup_project.py --to ../myproject --apply
 ```
 
-Writes `sources.csv`, `frame.csv`, and `frame.json`. Transcripts are imported only
-once `transcripts_confirmed` is true, because a wrong id mislabels every quote
-from that recording.
+Writes `sources.csv`, `frame.csv` and `frame.json`. Transcripts are imported only
+once you set `transcripts_confirmed` to true, because a wrong id mislabels every
+quote from that recording.
 
-### 2. Code
+### 2 · Code
 
 Read and code in whatever you like — Excel, Sheets, a text editor. Save as CSV.
 `coding_sheet_template.csv` shows the shape:
 
 | column | |
 |---|---|
-| `quote` | required — the passage, pasted |
-| `code` | required — one code, or several separated by `;` |
+| `quote` | **required** — the passage, pasted |
+| `code` | **required** — one code, or several separated by `;` |
 | `valence` | optional — `pos` / `neg` / `mixed` / `neutral`; blank stays blank |
 | `note` | optional — kept with the coding |
 | `pid`, `unit` | optional — only to disambiguate, when the report asks |
 
 Column names are matched loosely: `Quote`, `CODE`, `Notes` all work.
 
-```
+```bash
 python file_codings.py --data ../myproject --sheet coding.csv
-python file_codings.py --data ../myproject --sheet coding.csv --apply
 ```
 
-Produces `data/excerpts.csv` — every quote with its provenance and character
+Reports what it would do and writes nothing. Add `--apply` when the report is
+clean. You get `data/excerpts.csv` — every quote with its provenance and character
 offsets — and `data/codings.csv`. Anything it could not place goes to
 `data/unresolved.csv` with the reason.
 
-Codes live in `codebook/codes.csv`, which you write as you go: an id, a lens, a
-name, the include and exclude rules, and optionally a valence the code carries by
-its nature.
+**How quotes are matched.** On normalised text: smart quotes and dashes folded,
+whitespace collapsed, case ignored. That absorbs almost everything copy-and-paste
+does to a passage. An exact match in exactly one document resolves; anything else
+is reported with the closest candidate and a similarity score. Nothing ambiguous
+is filed silently.
 
-**The lens is structural, not decoration.** It is what the discussion page groups
-by, and what the coding rail filters and groups the codebook by, so a code with no
-lens is one you will not see coming. Conventionally a code id is `PREFIX-SOMETHING`
-and the prefix is the lens — `PLC-ANCHOR` under Place, `ENJ-EXPLORE` under
-Enjoyment. A stub created by `--allow-new-codes` inherits the lens its prefix-mates
-use, and `file_codings.py` lists any code still without one.
+**Codes** live in `codebook/codes.csv`, which you write as you go: an id, a lens,
+a name, the include and exclude rules, and optionally a valence the code carries
+by its nature.
+
+> **The lens is structural, not decoration.** It is what the discussion page
+> groups by and what the codebook filters on, so a code with no lens is one you
+> will not see coming. Conventionally a code id is `PREFIX-SOMETHING` and the
+> prefix is the lens. A stub created by `--allow-new-codes` inherits the lens its
+> prefix-mates use, and `file_codings.py` lists any code still without one.
 
 **Settle any valence you left blank:**
 
-```
-python valence.py --data ../myproject --dry-run
+```bash
 python valence.py --data ../myproject --apply
 ```
 
-Two judgements kept apart. The *code* may declare a polarity, which needs no model
-and sends nothing anywhere. The *model* reads the excerpt and judges what was
-said. Where they agree it is written; where they disagree neither wins and the
-excerpt is listed for you; where only one has a view, that one is used. Read the
-disagreements — when several land on one code, the code's declared valence is
-usually what is wrong.
+Two judgements kept apart. The *code* may declare a polarity — a frustration code
+is negative wherever it lands — which needs no model and sends nothing anywhere.
+The *model* reads the excerpt and judges what was actually said. Where they agree
+it is written; where they disagree neither wins and the excerpt is listed for you;
+where only one has a view, that one is used. `--offline` uses `codes.csv` alone.
+
+Read the disagreements. When several land on one code, it is usually the code's
+declared valence that is wrong, not the passages.
 
 **Or code in the browser:**
 
-```
+```bash
 python serve.py --data ../myproject
 ```
 
 Secondary to the spreadsheet, but good for reading a whole transcript with its
 excerpts highlighted, and for coding the odd passage in place.
 
-### 3. Findings
+### 3 · Build the site
 
-```
+```bash
 python findings.py --data ../myproject --generate
-python findings.py --data ../myproject --codebook
-python findings.py --data ../myproject --discussion --summarise
-python findings.py --data ../myproject --add "differences between the two conditions for the top ten codes"
 ```
 
-**Any of these rebuilds all three pages.** They share a masthead, a nav, a theme
-and a figures strip, so a change to any of those changes all three — and updating
-a heading should not be a three-command job.
+Three pages, cross-linked, sharing a masthead and a theme picker:
+
+| page | what it holds |
+|---|---|
+| **Findings** | prevalence, valence, splits by category, measures, co-occurrence, source dependence |
+| **Codebook** | every code under its lens with definition, rules, prevalence bar and an example passage |
+| **Discussion** | your method notes, then your coding notes grouped by lens |
+
+**Any `findings.py` command writes all three pages.** They share a masthead, a
+nav and a theme, so a change to any of those changes all three. The flag chooses
+what to *recompute*, not what to write.
 
 Every figure is a **spec** — a small JSON object saying what to compare — kept in
 `findings/specs.json`. Rendering is deterministic from spec plus data, so the page
 rebuilds from the corpus and two people with the same corpus get the same page.
 Custom findings survive a regenerate.
 
-Built-in kinds: `prevalence`, `valence`, `split` (code by category), `measures`
-(where a code coincides with higher or lower scores), `cooccur` (which codes land
-together, at `unit` or `excerpt` level), `dependence` (which kind of source the
-evidence came from).
+```bash
+python findings.py --data ../myproject --add "differences between the two conditions for the top ten codes"
+```
 
 `--add` turns a request in words into a spec. It never returns a number and never
 sees a quote.
 
-**The codebook page** is `--codebook`: every code under its lens, with its
-definition, include and exclude rules, prevalence, valence spread, and one passage
-showing what it means. Code ids mentioned in an exclude rule become links, since
-those rules are mostly cross-references and following them by hand is how a
-codebook stops being read.
+---
 
-**Lenses combine.** Clicking a second lens chip adds it rather than replacing the
-first, so you can read enjoyment and place together. Search narrows within
-whatever lenses are lit, and the tally says how much of the page you are looking
-at. It earns its keep most on the discussion page, where the question is usually
-what two lenses say about the same thing.
+## The site it builds
 
-Each code carries a prevalence bar on a **0–100 scale**, not scaled to the most
-common code: a bar scaled to the leader makes the top code look total whatever it
-actually reached, which is the wrong impression to give about a corpus where
-nothing passes a third. A rare code therefore draws a sliver, so a non-zero value
-gets a minimum width — *rare* and *never* must not look the same, and only zero
-draws nothing.
+### Naming it
 
-The example passage comes from the `anchor` column of `codes.csv` if you put an
-`excerpt_id` there. If you do not, one is chosen — preferring a coding you
-annotated, then the one closest to the median length for that code, because the
-shortest is usually a fragment and the longest is usually somebody rambling. An
-auto-chosen quote is labelled as such, so a pinned example is never mistaken for a
-lucky one.
-
-**The discussion page has two halves, and they come from different places.**
-
-*About the study* comes from `codebook/notes.csv`, which you keep by hand — notes
-about method rather than about any code. That the survey caught the moment and the
-interview caught the reflection; that the weather was cold; that a column in the
-raw export is wrong for nine people; that something you looked for was not there.
-`notes_template.csv` shows the shape:
-
-```
-note_id, category, title, note, evidence
+```bash
+python siteinfo.py --data ../myproject --init
 ```
 
-`category` is yours to invent — Instrument, Confound, Design, Attribution, Null
-result, Source data, Coverage all earn their keep. `evidence` is optional and may
-name a `source_id` or an `excerpt_id`; a third of these notes have no single
-passage behind them, which is the point of keeping them separately.
+Writes `site.json`. With no file at all the title is the project folder's own
+name, which is right often enough to be a useful default and wrong in a way that
+is obvious on sight.
 
-These are shown **as written and never summarised**. They are already your prose,
-and a model rewriting them could only add drift.
+| field | where it appears |
+|---|---|
+| `title`, `version` | the h1, version greyed beside it |
+| `project` | the eyebrow above it |
+| `description` | the standfirst |
+| `authors`, `footer` | the footer |
 
-*By lens* comes from the `note` column beside each coding, grouped by the lens of
-the code it sits on. `--summarise` writes one paragraph per lens from those, and
-is most useful where it catches two notes disagreeing.
+### Reading it
+
+The codebook and discussion pages carry a **search box** — press `/`, Escape
+clears — and **lens filter chips** with counts. Lenses combine rather than
+replace, so you can read two at once. Matching happens in the page: no reload, no
+server, no index to keep in step.
+
+### Themes
+
+A project ships **several themes and a picker**, not one baked-in look. Somebody
+who needs high contrast should not have to ask you for a rebuild. The choice
+follows the reader between pages, and *Match my system* hands control back to
+their own light/dark setting.
+
+```bash
+python theme.py --data ../myproject --list
+python theme.py --data ../myproject --from palette.png --name housestyle
+python theme.py --data ../myproject --favicon logo.png
+```
+
+Four ship by default: **Light**, **Dark**, **High contrast** and **Dusk**. Each
+carries its own **typography and shape** as well as colours — High contrast has
+square corners and a heavier rule; Dusk has soft corners and a serif body — so
+switching changes the page rather than repainting it.
+
+`--from` matches a source. A list of hex colours needs no model: the colours are
+already the answer, and the work is assigning them to roles. **A URL or an image
+is why a model is involved at all.** For a URL, codeframe fetches the site's own
+stylesheets and counts what is actually in them — colours by frequency,
+typefaces, corner radii — and hands the model measurements rather than asking it
+to imagine a palette. For an image, the CLI is granted `Read` so it can see the
+picture.
+
+**Readability is computed, not taken on trust.** Before any theme is written:
+
+| check | floor |
+|---|---|
+| body text on ground, and on a card | 4.5:1 |
+| secondary ink, include/exclude rules | 4.5:1 |
+| muted ink, accent and valence marks | 3:1 |
+| `pos` against `neg` under deuteranopia | ΔE 8 |
+
+A colour that misses a floor is nudged along its own lightness — hue and chroma
+kept — by the smallest step that passes, and every adjustment is printed. If that
+cannot save it, the theme is refused rather than written.
+
+> One thing colour cannot fix: deuteranopia collapses hue onto roughly one
+> blue–yellow axis, so once `pos` and `neg` hold the two poles there is no third
+> hue left for `mixed`. It carries a diagonal stripe as well as a colour, and the
+> legend and its fixed place in the stack do the rest. The checker says so rather
+> than pretending otherwise.
 
 ---
 
-## The denominator
+## Where a model is involved
 
-Rates are over the **participant frame** in `frame.csv` — one row per (pid, unit).
-Those rows exist whether or not anything has been coded, so "31% of units" means
-31% of the study, not 31% of whatever happened to get coded. This is what lets
-prevalence stay meaningful while segmentation stays emergent.
+Four steps, all optional, none load-bearing. **A model never produces a number.**
+It proposes a column mapping, a chart spec, a valence, a summary paragraph — and
+every figure is computed locally from the corpus. That is not fastidiousness: a
+model asked to do arithmetic over a corpus it cannot see returns *plausible*
+figures, and plausible figures in a findings section are worse than none.
 
-A source belonging to no single unit — an interview covering a whole session, say
-— can be read, quoted and coded like any other, but is counted against the
-participant rather than a unit, and the reports say so rather than quietly
-dropping it.
+| step | sends | never sends |
+|---|---|---|
+| `setup_project.py --review` | column names, statistics, category values | free text; identifiers are masked to shapes |
+| `valence.py` | unjudged excerpts and your notes | pids, source ids, already-judged excerpts |
+| `findings.py --discussion --summarise` | your notes | the passages behind them |
+| `findings.py --add` | code names and category names | any quote |
+| `theme.py --from` | measured colours and font names | nothing from your corpus |
 
-## What the project calls things
+Everything that sends anything takes `--dry-run`, which prints the exact payload
+and sends nothing. Run it first on data you are answerable for.
 
-`frame.json` records `unit_label` (what one row of the frame is: a game, a visit,
-a session) and `kinds` (the sorts of source in the corpus). Every tool reads its
-nouns from there, so a study of museum visits says "36 visits" and offers a Kind
-filter of `diary` and `focus_group`. `facets` is the shortlist of categories the
-coding rail and the default findings splits use — drop a name from it to remove a
-dropdown without touching the data.
+### If you have no account
 
-## Rebuilding a project that already exists
+Most of this does not need one:
 
-`--apply` can be re-run at any time; everything derived regenerates from
-`setup.json`. Two things are protected because they are decisions rather than
-derived values:
+```
+setup_project.py (except --review)    file_codings.py
+valence.py --offline                  serve.py
+findings.py --generate / --codebook / --discussion
+```
 
-**A trimmed `facets` list survives a rebuild.** If you have removed a category
-from the coding rail, it stays removed.
+You can take a project from raw spreadsheets to a full site without sending
+anything: the mapping in `setup.json` is editable by hand, valence can come from
+`codes.csv`, and every figure is computed locally regardless. The four steps that
+do ask will tell you what to do rather than failing obscurely.
+
+### Choosing the model
+
+```bash
+python model.py
+python model.py opus --check
+```
+
+The choice is written to `config.json` beside the scripts and read by every
+model-backed step; any of them still takes `--model` to override for one run.
+`--check` sends one trivial request and reports which model actually answered,
+because a model name is not validated until something is sent and the worst
+moment to find a typo is part-way through a long pass.
+
+Honest guidance: **this tool does not need a large model.** Nothing here asks one
+to do arithmetic or write a finding.
+
+---
+
+## Reference
+
+### Every command
+
+```bash
+python setup_project.py --raw ../raw --to ../myproject [--skip folder,folder]
+python setup_project.py --to ../myproject --review [--dry-run] [--model NAME]
+python setup_project.py --to ../myproject --apply [--allow-rename]
+
+python file_codings.py --data ../myproject --sheet coding.csv [--apply] [--allow-new-codes] [--coder NAME]
+python valence.py --data ../myproject [--dry-run | --offline] [--apply] [--batch N]
+python serve.py --data ../myproject [--port N] [--read-only] [--no-open] [--coder NAME]
+
+python findings.py --data ../myproject --generate
+python findings.py --data ../myproject --codebook
+python findings.py --data ../myproject --discussion [--summarise]
+python findings.py --data ../myproject --add "a request in words"
+
+python siteinfo.py --data ../myproject --init
+python siteinfo.py --data ../myproject --title T --version V --project P --description D --authors "A, B"
+python theme.py --data ../myproject [--list] [--default NAME] [--drop NAME] [--reset]
+python theme.py --data ../myproject --from SOURCE [--name NAME] [--force]
+python theme.py --data ../myproject --favicon logo.png
+python model.py [NAME] [--check] [--login] [--clear]
+```
+
+### What each file does
+
+| | |
+|---|---|
+| `setup_project.py` | profile raw data, propose a mapping, build the project |
+| `review.py` | the optional model check of that mapping — the only place a request is built |
+| `file_codings.py` | file a coding spreadsheet against the corpus |
+| `valence.py` | settle valences left blank |
+| `project.py` | project state, shared by the tools |
+| `serve.py` | the browser coding tool |
+| `findings.py` | build the three pages |
+| `siteinfo.py` | what the site calls itself |
+| `theme.py` | the themes it ships with |
+| `model.py` | which model the model-backed steps use |
+
+### What a project directory holds
+
+```
+myproject/
+├── sources.csv             the material to read and quote from
+├── frame.csv               one row per (pid, unit) — the denominator
+├── frame.json              which columns are categories, which are measures
+├── setup.json              the mapping — only if setup_project.py built it
+├── site.json               title, authors, description — optional
+├── theme.json              the themes the pages ship with — optional
+├── codebook/
+│   ├── codes.csv           your codes
+│   └── notes.csv           method notes — optional
+├── data/
+│   ├── excerpts.csv        every quote, with provenance
+│   ├── codings.csv         which code sits on which excerpt
+│   └── unresolved.csv      what could not be placed, and why
+└── findings/
+    ├── findings.html  codebook.html  discussion.html
+    └── specs.json          what each figure compares
+```
+
+### What the project calls things
+
+`frame.json` records `unit_label` (a game, a visit, a session) and `kinds` (the
+sorts of source in the corpus). Every tool reads its nouns from there, so a study
+of museum visits says *"36 visits"* and offers a Kind filter of `diary` and
+`focus_group`. `facets` is the shortlist of categories the coding rail and the
+default findings splits use.
+
+### Rebuilding a project that already exists
+
+`--apply` can be re-run at any time. Two things are protected because they are
+decisions rather than derived values:
+
+**A trimmed `facets` list survives a rebuild.** If you removed a category from
+the coding rail, it stays removed.
 
 **Renaming an existing frame column is refused.** Labels are proposed, not
-derived, so two runs of `--review` over the same data can land on `device` and
-`phone_os` for the same column. Either is a fine name; changing it under a project
-that has already been built is not, because a `facets` entry or a saved finding
-refers to columns by name, and a renamed column does not error — it silently stops
-matching. `frame.json` records which header each label came from, so a rename is
-told apart from a column appearing or disappearing, and the refusal names
-everything that referred to the old name. Pass `--allow-rename` when you mean it.
+derived, so two runs of `--review` can land on `device` and `phone_os` for the
+same column. Either is fine; changing it under a project already built is not,
+because a saved finding refers to columns by name and a renamed column does not
+error — it silently stops matching. Pass `--allow-rename` when you mean it.
 
-## Bringing your own data
+### Bringing your own data
 
 `setup_project.py` is one route in. Anything that writes a `sources.csv` with
 these columns will do:
@@ -343,184 +411,7 @@ source_id, pid, unit, kind, label, text
 plus a `frame.csv` keyed on `pid, unit`. Only `source_id`, `pid`, `unit` and
 `text` are required.
 
-## What the site calls itself
-
-```
-python siteinfo.py --data ../myproject --init
-python siteinfo.py --data ../myproject --title "Qualitative codebook" --version v0.4
-```
-
-Read from `<project>/site.json`. Nothing is required — with no file at all the
-title is the project folder's own name, which is right often enough to be a
-sensible default and wrong in a way that is obvious the moment you look.
-
-| | |
-|---|---|
-| `title` | the h1 |
-| `version` | beside it, greyed |
-| `project` | the eyebrow above it — the study or programme this belongs to |
-| `description` | the standfirst under it |
-| `authors` | shown in the footer |
-| `footer` | a licence, a DOI, a date — whatever else belongs at the bottom |
-
-Every page opens with that masthead, then the headline figures, then the nav.
-The codebook and discussion pages carry a **search box** (press `/`, Escape
-clears) and **filter-by-lens chips** with counts; matching happens in the page,
-with no reload and no server, and a lens heading with nothing left under it hides
-itself. Everything is searchable, including the method notes — searching
-*weather* on the discussion page finds the note about the cold.
-
-## How the pages look
-
-The reader's choice follows them between pages two ways: it is stored in
-`localStorage`, and the nav links carry it as `?theme=`. The second matters more
-than it sounds — `localStorage` is per-origin, so opening the pages from a
-`file://` path or inside a preview pane can give each page its own empty store,
-and the choice would be forgotten on every click. A small script in `<head>`
-reads the URL first, then storage, and applies the theme before the page paints,
-so there is no flash of the default either.
-
-
-
-A project ships **several themes, not one**. Every page carries all of them plus a
-picker, so the reader chooses — and "Match my system" hands control back to their
-own light/dark setting. The choice is remembered per reader in `localStorage`.
-That matters: somebody who needs high contrast should not have to ask you for a
-rebuild.
-
-```
-python theme.py --data ../myproject --list
-python theme.py --data ../myproject --default chalk
-python theme.py --data ../myproject --from palette.png --name understory
-python theme.py --data ../myproject --from https://example.org
-python theme.py --data ../myproject --drop understory
-python theme.py --data ../myproject --favicon logo.png
-```
-
-Four ship by default: **Sarsen**, **Sarsen dark**, **Chalk (high contrast)**, and
-**Dusk**. `--default` only decides which opens before the reader chooses.
-
-`--from` adds one. Hex colours need no vision — they are already the answer, and
-the work is assigning them to roles. **An image or a URL is why this involves a
-model at all**: it must see the thing, so the CLI is granted `Read` for a file or
-`WebFetch` for a page, one tool, only for that call. Fonts come back too.
-
-### A theme is more than a palette
-
-Each theme carries its own **typography and shape** as well as colours, so
-switching one changes the page rather than repainting it. Chalk has square
-corners, a 2px rule and one plain face throughout, because the point of a
-high-contrast theme is that nothing is soft. Dusk has 9px corners and a serif
-body, because it is the one for reading at length.
-
-A theme that names none of its own falls back to the project's, and then to the
-defaults — so you can still set one typeface for everything if you prefer.
-
-### Tokens worth knowing
-
-| | |
-|---|---|
-| `include` / `exclude` | the two halves of a code definition. Green-ish and red-ish deliberately — these are never compared to each other in a chart, so hue may carry the distinction. |
-| `pos` / `neg` | favourable and unfavourable. These *are* compared, in stacked bars, so they are blue and orange and are checked against a deuteranopia simulation. |
-| `series-a` / `series-b` | extra chart series beyond the valence pair. |
-| `font-display` | headings and headline figures, separate from body and mono. |
-
-### Readability is computed, not taken on trust
-
-Every theme in the project is checked before anything is written — contrast for
-text and marks, and `pos` against `neg` under deuteranopia (OKLab ΔE ≥ 8). A theme
-that fails is reported and not written unless you pass `--force`.
-
-One thing colour cannot fix: deuteranopia collapses hue onto roughly one
-blue–yellow axis, so once `pos` and `neg` hold the two poles there is no third hue
-left for `mixed`. It carries a diagonal stripe as well as a colour, and the legend
-and its fixed place in the stack do the rest. The checker says so rather than
-pretending otherwise.
-
-## If you have no Claude account
-
-Most of this does not need one. Only four steps ask a model:
-
-```
-setup_project.py --review          findings.py --add
-valence.py                         findings.py --discussion --summarise
-```
-
-Setup, `--apply`, `file_codings.py`, `serve.py`, `valence.py --offline`,
-`findings.py --generate` and `--discussion` all run on your machine alone. You can
-take a project from raw spreadsheets to a full findings page without ever sending
-anything: the mapping in `setup.json` is editable by hand, valence can come from
-`codes.csv`, and every figure is computed locally in any case.
-
-The four that do ask will tell you what to do rather than failing obscurely:
-
-```
-the claude CLI is installed but not signed in.
-
-    claude auth login          (or  python model.py --login)
-    claude auth status         to check it worked
-```
-
-`python model.py --login` hands the terminal over to `claude auth login`, which
-opens a browser. `python model.py` on its own reports whether you are signed in
-and as whom — that check runs locally, costs nothing, and sends nothing.
-
-## Choosing the model
-
-```
-python model.py                 # what is set, and what else is available
-python model.py opus --check    # set it, and prove the CLI accepts it
-python model.py --clear         # back to the default
-```
-
-The choice is written to `config.json` beside the scripts and read by every step
-that can call a model. Any of them still takes `--model` to override it for a
-single run.
-
-| alias | id | context | in / out per Mtok | |
-|---|---|---|---|---|
-| `fable` | `claude-fable-5` | 1M | $10 / $50 | most capable; for the hardest reasoning |
-| `opus` | `claude-opus-5` | 1M | $5 / $25 | strong general reasoning |
-| `sonnet` | `claude-sonnet-5` | 1M | $3 / $15 | the default here |
-| `haiku` | `claude-haiku-4-5` | 200K | $1 / $5 | cheapest; for large repeated passes |
-
-*Model list and prices cached 2026-06-24. Prices are first-party API rates, here
-for relative scale — requests go through the Claude Code CLI, which bills against
-whatever plan you are signed in with, so there is no API key to set.*
-
-An alias resolves to the current model of that family, so `opus` keeps working
-after a new Opus is released. A pinned id keeps a study reproducible. For work you
-intend to write up, pin the id.
-
-**Which to pick.** Nothing here asks a model to do arithmetic or to write a
-finding — it proposes a column mapping, a chart spec, a valence, a summary
-paragraph — so the cheaper models are not obviously worse at these jobs. Sonnet is
-the default because it has been enough for all four. Reach for Opus when a mapping
-is genuinely ambiguous or a corpus is unusual; reach for Haiku when you are
-re-running a valence pass over hundreds of excerpts and cost is the constraint.
-
-`--check` sends one trivial request and reports which model actually answered. A
-model name is not validated until something is sent, and the worst moment to
-discover a typo is part-way through a long pass.
-
-## Where a model is involved
-
-Three places, all optional, none of them load-bearing:
-
-| | sends | never sends |
-|---|---|---|
-| `--review` | column names, statistics, category values | free text, masked identifiers |
-| `valence.py` | unjudged excerpts and your notes | pids, source ids, judged excerpts |
-| `--discussion --summarise` | your notes | the passages behind them |
-
-**A model never produces a number.** It proposes a column mapping, a chart spec, a
-valence, a summary paragraph — and every figure is computed locally from the
-corpus. That is not fastidiousness: a model asked to do arithmetic over a corpus
-it cannot see returns plausible figures, and plausible figures in a findings
-section are worse than none.
-
-Everything that sends anything takes `--dry-run`, which prints the exact payload
-and sends nothing. Run it first on data you are answerable for.
+---
 
 ## Safety
 
@@ -528,14 +419,20 @@ Every write goes through a temp file and an atomic replace. The tools write only
 inside the project directory. `serve.py` binds to `127.0.0.1` and takes
 `--read-only`.
 
-Keep the project under git. The history of `codes.csv` is a record of how the
-frame evolved, which is worth having when the methods section asks.
+Keep the project under version control. The history of `codes.csv` is a record of
+how the frame evolved, which is worth having when the methods section asks.
+
+**If your corpus contains identifiable or sensitive material**, note that
+`sources.csv` holds the full text of everything you imported, and the generated
+pages quote from it. Treat the project directory with the same care as the raw
+data, and read `--dry-run` output before using any step that sends.
 
 ## Not yet
 
 - **Reliability.** Two coders over the same passages, and an agreement figure.
-- **Notes into prose.** Notes are bundled by lens on the discussion page; turning
+- **Notes into prose.** Notes are grouped by lens on the discussion page; turning
   a lens into an argument is still yours.
-- **Codebook assistance.** Proposing a starting codebook from a sample, or hunting
-  candidates for an existing code. Both need the source text itself, so both need
-  their own decision about what may leave the machine.
+- **Codebook assistance.** Proposing a starting codebook from a sample, or
+  hunting candidates for an existing code. Both need the source text itself, so
+  both need their own decision about what may leave the machine.
+- **A matched light/dark pair from one source.** `--from` adds one theme per run.
