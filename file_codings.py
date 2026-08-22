@@ -137,6 +137,13 @@ def read_sheet(path):
     return rows, found, unknown
 
 
+def _read(path):
+    if not os.path.exists(path):
+        return []
+    with io.open(path, encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
 def lens_for(cid, codes):
     """The lens the other codes sharing this id's prefix use, if they agree enough."""
     prefix = str(cid).split("-")[0].upper()
@@ -173,6 +180,10 @@ def main():
     if os.path.exists(frame_path):
         for r in alias_unit(list(csv.DictReader(open(frame_path, encoding="utf-8")))):
             frame[(r["pid"], r["game"])] = r
+    # a sheet coded before a merge still names the old id; the register says
+    # where it went, so map it forward rather than reporting an unknown code
+    from retire import load_register
+    _reg, _ = load_register(root)
     codes_path = os.path.join(root, "codebook", "codes.csv")
     codes = list(csv.DictReader(open(codes_path, encoding="utf-8"))) \
         if os.path.exists(codes_path) else []
@@ -201,6 +212,11 @@ def main():
             continue
 
         cids = [c.strip().upper() for c in re.split(r"[;|,]", raw_codes) if c.strip()]
+        # Map a merged code forward BEFORE checking it against the codebook. A
+        # sheet coded last month names the id that existed last month, and
+        # rejecting it as unknown would make every merge invalidate work in
+        # progress.
+        cids = [_reg.get(c) or c for c in cids]
         bad = [c for c in cids if c not in known]
         if bad and not a.allow_new_codes:
             problems.append((n_row, quote[:60],
@@ -318,12 +334,29 @@ def main():
             w.writerows([{k: r.get(k, "") for k in fields} for r in rowset])
         os.replace(tmp, path)
 
+    # Filing a sheet replaces THIS coder's codings and leaves everyone else's
+    # alone. Rewriting the whole file made a second coder wipe the first, which
+    # is silent, total, and exactly what reliability work needs not to happen.
+    kept = [r for r in _read(os.path.join(d, "codings.csv"))
+            if (r.get("coder") or "").strip() != a.coder]
+    if kept:
+        others = sorted({(r.get("coder") or "(unnamed)") for r in kept})
+        print(f"\nkept {len(kept)} coding(s) by {', '.join(others)}")
+
+    # an excerpt is a passage, not a judgement, so excerpts are merged rather
+    # than replaced - two coders marking the same span share one excerpt
+    prior = {x["excerpt_id"]: x for x in _read(os.path.join(d, "excerpts.csv"))}
+    still = {c["excerpt_id"] for c in kept}
+    merged = {k: v for k, v in prior.items() if k in still}
+    merged.update(excerpts)
+
     write(os.path.join(d, "excerpts.csv"),
           ["excerpt_id", "source_id", "pid", "unit", "kind", "label",
            "start", "end", "text"],
-          sorted(excerpts.values(), key=lambda x: (x["source_id"], x["start"])))
+          sorted(merged.values(), key=lambda x: (x["source_id"], int(x["start"]))))
     write(os.path.join(d, "codings.csv"),
-          ["excerpt_id", "code_id", "valence", "coder", "note", "sheet_row"], codings)
+          ["excerpt_id", "code_id", "valence", "coder", "note", "sheet_row"],
+          kept + codings)
     write(os.path.join(d, "unresolved.csv"),
           ["sheet_row", "quote", "reason", "closest_source", "similarity"],
           [{"sheet_row": p[0], "quote": p[1], "reason": p[2],

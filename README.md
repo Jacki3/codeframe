@@ -191,6 +191,58 @@ sees a quote.
 
 ---
 
+## Checking your work
+
+```bash
+python audit.py --data ../myproject
+```
+
+Nothing else verifies that `sources.csv` and `frame.csv` say what you believe.
+An import that silently drops a third of the interview text produces a complete,
+plausible, **wrong** set of findings, and the only symptom is that the corpus
+looks a bit thin. The audit lists what is actually there and every inconsistency
+it can find: sources with no text, frame rows nothing can ever be coded to,
+sources naming a unit outside the frame, excerpts whose offsets no longer match
+the text beneath them, orphaned codes, participants with nothing coded, and any
+one participant dominating the codings.
+
+### Two coders
+
+```bash
+python file_codings.py --data ../myproject --sheet theirs.csv --coder jb --apply
+python audit.py --data ../myproject --reliability
+```
+
+Filing a sheet replaces **that coder's** codings and leaves everyone else's
+alone, so two people can work on one project. You get per-code Cohen's κ, exact
+agreement, and — the useful part — the list of passages to reconcile.
+
+> **The honest limitation.** Agreement assumes both coders judged the same units,
+> but in an excerpt-first model there are no units until somebody selects one. If
+> a second coder never marks a passage, nothing in the data says whether they
+> disagreed or never read it. Counting that as agreement would inflate every
+> figure, so the comparison is made over the excerpts **both** coders touched and
+> everything outside is reported separately.
+
+### When the codebook changes
+
+```bash
+python retire.py --data ../myproject --merge ENJ-FUN ENJ-ENJOYMENT --note "same idea"
+python retire.py --data ../myproject
+```
+
+An emergent codebook is meant to change. Editing `codes.csv` by hand does it
+badly: every coding still names the old id, nothing complains, and the code
+vanishes from the codebook page while its codings sit unreachable — prevalence
+drops and nothing says why.
+
+`codebook/retired_codes.csv` records what was merged, into what, and why. Existing
+codings are rewritten, and a sheet coded *before* the merge still files correctly
+because the old id is mapped forward. It is also the register a methods section
+gets written from.
+
+---
+
 ## The site it builds
 
 ### Naming it
@@ -283,6 +335,31 @@ figures, and plausible figures in a findings section are worse than none.
 Everything that sends anything takes `--dry-run`, which prints the exact payload
 and sends nothing. Run it first on data you are answerable for.
 
+### `propose_codes.py` — use with caution
+
+There is a fifth, deliberately held apart from the others, because **it
+undermines the rest.** It draws a sample of your corpus and proposes a starting
+codebook from it.
+
+It sends more participant speech than anything else here, and unlike `valence.py`
+it is not confined to passages you already chose. It is the most expensive step by
+a distance. And it costs you the thing that makes an inductive codebook worth
+having: a frame you built by reading is one you can defend line by line, while a
+frame you accepted is one you will be asked to justify and will not be able to.
+Reading a proposed code also makes it markedly harder to notice the code you would
+have written instead — and that effect is strongest at the start, which is exactly
+when you would reach for it.
+
+It is included because a blank codebook is a genuinely hard place to begin. It is
+built so that using it is a decision you keep making: **nothing is ever written to
+`codes.csv`.** Proposals land in `codebook/proposed_codes.csv` marked
+`machine-proposed`, and moving one into the codebook is a thing you do by hand,
+having read the passages it came from.
+
+The sample is drawn with a fixed seed, proportionally by source kind, and the word
+count is reported before anything is sent — a nominal 5% of sources can be a much
+larger share of the words.
+
 ### If you have no account
 
 Most of this does not need one:
@@ -340,6 +417,10 @@ python theme.py --data ../myproject [--list] [--default NAME] [--drop NAME] [--r
 python theme.py --data ../myproject --from SOURCE [--name NAME] [--force]
 python theme.py --data ../myproject --favicon logo.png
 python model.py [NAME] [--check] [--login] [--clear]
+
+python audit.py --data ../myproject [--reliability] [--against CODER]
+python retire.py --data ../myproject [--merge OLD NEW | --retire CODE] [--note "why"] [--force]
+python propose_codes.py --data ../myproject --lenses "A,B" [--sample N] [--n N] [--seed N] [--kind K] [--dry-run] [--apply]
 ```
 
 ### What each file does
@@ -356,6 +437,9 @@ python model.py [NAME] [--check] [--login] [--clear]
 | `siteinfo.py` | what the site calls itself |
 | `theme.py` | the themes it ships with |
 | `model.py` | which model the model-backed steps use |
+| `audit.py` | check the corpus, and measure agreement between coders |
+| `retire.py` | merge or retire a code without orphaning what you coded |
+| `propose_codes.py` | propose a starting codebook from a sample — **read its warnings** |
 
 ### What a project directory holds
 
