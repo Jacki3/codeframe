@@ -1,8 +1,20 @@
 """Draw a sample of the corpus and propose a starting codebook from it.
 
     python propose_codes.py --data ../myproject --lenses "Enjoyment,Place" --dry-run
-    python propose_codes.py --data ../myproject --lenses "Enjoyment,Place" --sample 10
-    python propose_codes.py --data ../myproject --lenses "..." --sample 10 --apply
+    python propose_codes.py --data ../myproject --lenses "Enjoyment,Place" --sample 10 --apply
+
+--sample is a PERCENTAGE OF SOURCES, not of words, and defaults to 10. The two
+are not the same thing and the difference matters, because what you pay for and
+what you expose is words:
+
+    --sample 5                     14 of 334 sources    2,982 words
+    --sample 10                    27 of 334 sources    3,396 words
+    --sample 25                    66 of 334 sources    7,958 words
+    --sample 10 --kind interview    1 of  10 sources    2,723 words
+
+One interview is nearly as many words as ten percent of everything, because
+interviews are long and survey answers are short. Dry-run first and read the word
+count before deciding.
 
 READ THIS BEFORE USING IT
 

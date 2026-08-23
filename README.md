@@ -357,9 +357,62 @@ built so that using it is a decision you keep making: **nothing is ever written 
 `machine-proposed`, and moving one into the codebook is a thing you do by hand,
 having read the passages it came from.
 
-The sample is drawn with a fixed seed, proportionally by source kind, and the word
-count is reported before anything is sent — a nominal 5% of sources can be a much
-larger share of the words.
+#### Using it
+
+**Always dry-run first.** It prints the sample and the exact payload, and sends
+nothing:
+
+```bash
+python propose_codes.py --data ../myproject --lenses "Enjoyment,Place,Perceptions" --sample 10 --dry-run
+```
+
+```
+sample: 27 of 334 sources, 3,396 words, 26 participants, seed 1
+  survey 26, interview 1
+  lenses: Enjoyment, Place, Perceptions
+```
+
+`--sample` is a **percentage of sources, not of words** — and the two are not the
+same thing. It defaults to `10`. Each source kind is sampled in proportion to its
+own size, and within a kind the draw goes round-robin by participant so one
+talkative person cannot define the frame.
+
+Watch the word count rather than the source count. On the corpus above:
+
+| | sources | words | |
+|---|---|---|---|
+| `--sample 5` | 14 | 2,982 | |
+| `--sample 10` | 27 | 3,396 | 26 participants, only 1 interview |
+| `--sample 25` | 66 | 7,958 | |
+| `--sample 10 --kind interview` | 1 | 2,723 | one long transcript ≈ the whole 10% sample |
+
+That last row is the point. Ten percent of the *interviews* is one transcript and
+almost as many words as ten percent of everything, because interviews are long and
+surveys are short. If your corpus mixes kinds, decide which you actually want to
+read.
+
+Then send it:
+
+```bash
+python propose_codes.py --data ../myproject --lenses "Enjoyment,Place,Perceptions" --sample 10 --apply
+```
+
+Other options: `--n 20` takes a fixed number of sources instead of a percentage,
+shared out across kinds by size. `--kind interview` restricts the draw to one
+kind. `--seed 1` fixes the sample — the same command twice gives the same
+passages, so a methods section can say which ones were read.
+
+#### What you get, and what to do with it
+
+`codebook/proposed_codes.csv`, in the same shape as `codes.csv` plus two columns:
+`source` (always `machine-proposed`) and `drawn_from` (the seed and sample size).
+Every `note` starts *"PROPOSED, not read by a human."*
+
+**Nothing is written to `codes.csv`, and nothing ever will be.** The intended
+workflow is: open the proposals beside the passages they were drawn from, discard
+the ones that do not survive that reading — most will not — rewrite the survivors
+in your own words, and move those across by hand. A code you have not argued with
+is one you cannot defend.
 
 ### If you have no account
 
