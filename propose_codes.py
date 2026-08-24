@@ -2,6 +2,7 @@
 
     python propose_codes.py --data ../myproject --lenses "Enjoyment,Place" --dry-run
     python propose_codes.py --data ../myproject --lenses "Enjoyment,Place" --sample 10 --apply
+    python propose_codes.py --data ../myproject --lenses "..." --pids assignment.csv
 
 --sample is a PERCENTAGE OF SOURCES, not of words, and defaults to 10. The two
 are not the same thing and the difference matters, because what you pay for and
@@ -169,6 +170,9 @@ def main():
     ap.add_argument("--seed", type=int, default=1,
                     help="same seed, same sample - record it in your methods")
     ap.add_argument("--kind", help="only sample this source kind")
+    ap.add_argument("--pids", metavar="FILE_OR_LIST",
+                    help="restrict to these participants: a comma-separated list, "
+                         "or a csv with a pid column (e.g. an assignment file)")
     ap.add_argument("--dry-run", action="store_true",
                     help="show the sample and the payload; send nothing")
     ap.add_argument("--apply", action="store_true",
@@ -184,6 +188,26 @@ def main():
         sources = [s for s in sources if s.get("kind") == a.kind]
         if not sources:
             raise SystemExit(f"no sources of kind {a.kind!r}")
+    if a.pids:
+        # Where the corpus is split between coders, the frame has to come out of
+        # the material this coder actually reads. Proposing from passages someone
+        # else will code builds a codebook nobody has read the evidence for, and
+        # sends speech that did not need to be sent.
+        if os.path.exists(a.pids):
+            with io.open(a.pids, encoding="utf-8") as f:
+                rows = list(csv.DictReader(f))
+            col = next((c for c in (rows[0] if rows else {}) if c.lower() == "pid"), None)
+            if not col:
+                raise SystemExit(f"{a.pids} has no pid column")
+            keep = {r[col].strip() for r in rows if r[col].strip()}
+        else:
+            keep = {p.strip() for p in a.pids.split(",") if p.strip()}
+        before = len(sources)
+        sources = [s for s in sources if s["pid"] in keep]
+        if not sources:
+            raise SystemExit(f"no sources for those {len(keep)} participant(s)")
+        print(f"restricted to {len(keep)} participant(s): "
+              f"{before} sources -> {len(sources)}")
     lenses = [l.strip() for l in a.lenses.split(",") if l.strip()]
     if not lenses:
         raise SystemExit("give at least one lens")
