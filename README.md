@@ -518,10 +518,16 @@ not required.
 
 ## Not yet
 
-- **Reliability.** Two coders over the same passages, and an agreement figure.
-- **Notes into prose.** Notes are grouped by lens on the discussion page; turning
-  a lens into an argument is still yours.
-- **Codebook assistance.** Proposing a starting codebook from a sample, or
-  hunting candidates for an existing code. Both need the source text itself, so
-  both need their own decision about what may leave the machine.
+- **Notes into an argument.** `--summarise` writes a paragraph per lens from the
+  coding notes. Turning those into a claim somebody could disagree with, and
+  defend, is still yours.
+- **Hunting candidates for an existing code.** `propose_codes.py` proposes a
+  codebook from a sample; going back through the corpus for more of what an
+  established code already covers is a different job, and needs its own decision
+  about what may leave the machine.
 - **A matched light/dark pair from one source.** `--from` adds one theme per run.
+- **Coming back in.** `export_qda.py` only goes out. Nothing here reads a `.qdpx`,
+  so coding done in another tool has to return by hand.
+- **Memos linked to the codes they discuss.** The REFI-QDA schema has links and
+  the exporter does not emit them, so standing notes arrive in NVivo as project
+  memos, attached to nothing.
