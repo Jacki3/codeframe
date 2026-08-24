@@ -447,6 +447,47 @@ to do arithmetic or write a finding.
 
 ---
 
+## Taking it somewhere else
+
+```bash
+python export_qda.py --data ../myproject --dry-run   # check, write nothing
+python export_qda.py --data ../myproject             # write myproject.qdpx
+```
+
+A project does not have to end here. `export_qda.py` writes
+[REFI-QDA](https://www.qdasoftware.org/) `.qdpx`, the open exchange format that
+NVivo, ATLAS.ti, MAXQDA, Quirkos and Dedoose all read. Codes, coded passages,
+cases with their attributes and your standing notes go across together, so the
+work arrives whole rather than as a codebook somebody has to code against again.
+
+In NVivo that is **File → Open Project**, choosing *REFI-QDA Project* in the
+file-type list — not File → Import, which is for NVivo's own projects.
+`--codebook` also writes a `.qdc`, which is codes and nothing else: the right
+thing to hand a second coder in another tool, and no use as a substitute for the
+project.
+
+A file is one participant and one unit, with their sources under the questions
+that produced them, so somebody opening the project reads a document rather than
+gathering fragments. Sources belonging to no single unit stay whole. Cases come
+out one per frame row, carrying every category and measure as an attribute.
+
+**On offsets.** A coded passage travels as a start and end position into a text
+file, so merging, line endings, a byte order mark or a character outside the
+Basic Multilingual Plane can each move a reference off the words it belongs to.
+Every offset is checked against the text as it will be written, and one mismatch
+stops the export. What no local check can settle is whether a given importer
+counts from zero or one — so `--dry-run` prints the shortest passages with their
+offsets and exact text. Import once, look at those, and you know. `--base 1` and
+`--end-inclusive` switch the convention.
+
+**On valence.** A REFI-QDA coding carries no attributes, so valence is emitted as
+its own code tree, co-coded onto the passage — which is what makes a Code ×
+Valence matrix query work. A passage carrying two codings of opposite valence is
+emitted once per valence at the same range, so the matrix stays exact rather than
+counting every code on that passage against both.
+
+---
+
 ## Reference
 
 Every command, what each file does, and the shape of a project directory:

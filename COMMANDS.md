@@ -32,6 +32,9 @@ python model.py [NAME] [--check] [--login] [--clear]
 python audit.py --data ../myproject [--reliability] [--against CODER]
 python retire.py --data ../myproject [--merge OLD NEW | --retire CODE] [--note "why"] [--force]
 python propose_codes.py --data ../myproject --lenses "A,B" [--sample N] [--n N] [--seed N] [--kind K] [--dry-run] [--apply]
+
+python export_qda.py --data ../myproject [--dry-run] [--codebook] [--no-merge] [--no-valence]
+python export_qda.py --data ../myproject [--newline lf|crlf] [--bom] [--base 0|1] [--end-inclusive]
 ```
 
 ## What each file does
@@ -51,6 +54,7 @@ python propose_codes.py --data ../myproject --lenses "A,B" [--sample N] [--n N] 
 | `audit.py` | check the corpus, and measure agreement between coders |
 | `retire.py` | merge or retire a code without orphaning what you coded |
 | `propose_codes.py` | propose a starting codebook from a sample — **read its warnings** |
+| `export_qda.py` | export the whole project as REFI-QDA `.qdpx`, for NVivo and the rest |
 
 ## What a project directory holds
 
