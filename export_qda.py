@@ -153,6 +153,24 @@ def transform(text, crlf):
     return text.replace("\n", "\r\n"), lambda i: i + nl[i]
 
 
+RULE = "─" * 66
+
+
+def heading(name, what, ids):
+    """A few lines at the top of every document saying what it is.
+
+    A file that opens straight into "[0:12] PID4: OK, I'm ready" tells a reader
+    nothing about who is speaking, how long the conversation ran, or which of it
+    has been coded. Two lines and a rule fix that, and cost only an offset shift
+    the caller already accounts for.
+
+    Deliberately no category or measure values here. Those are case attributes,
+    where they are queryable, and repeating them as text would put every one of
+    them into the results of every text search that happens to match.
+    """
+    return f"{name}\n{what} · {', '.join(ids)}\n{RULE}\n\n"
+
+
 def documents(D, merge):
     """The files that will exist, and where each source's text sits inside one.
 
@@ -172,41 +190,48 @@ def documents(D, merge):
     source and the caller checks each one against the original text.
     """
     docs, place = {}, {}                 # doc_id -> {...}, source_id -> (doc_id, shift)
+
+    def whole(s, name):
+        """A source that stands alone, with a heading so it explains itself."""
+        head = heading(name, f'{s["kind"] or "source"} · {s["label"]}'
+                             if (s["label"] or "").strip() else s["kind"],
+                       [s["source_id"]])
+        docs[s["source_id"]] = {
+            "name": name, "text": head + s["text"].strip() + "\n",
+            "desc": f'{s["kind"]}: {s["label"]}',
+            "pid": s["pid"], "unit": s["unit"]}
+        place[s["source_id"]] = (s["source_id"], len(head))
+
     if not merge:
         for s in D["sources"]:
-            docs[s["source_id"]] = {
-                "name": f'{who(s["pid"])} · {s["unit"] or s["kind"] or "-"} · {s["source_id"]}',
-                "text": s["text"], "desc": f'{s["kind"]}: {s["label"]}',
-                "pid": s["pid"], "unit": s["unit"]}
-            place[s["source_id"]] = (s["source_id"], 0)
+            whole(s, f'{who(s["pid"])} · {s["unit"] or s["kind"] or "-"} · {s["source_id"]}')
         return docs, place
 
     grouped = collections.defaultdict(list)
     for s in D["sources"]:
         if not (s["unit"] or "").strip():
-            docs[s["source_id"]] = {
-                "name": f'{who(s["pid"])} · {s["kind"] or "source"}',
-                "text": s["text"], "desc": f'{s["kind"]}: {s["label"]}',
-                "pid": s["pid"], "unit": ""}
-            place[s["source_id"]] = (s["source_id"], 0)
+            whole(s, f'{who(s["pid"])} · {s["kind"] or "source"}')
         else:
             grouped[(s["pid"], s["unit"])].append(s)
 
     for (pid, unit), members in sorted(grouped.items(), key=lambda kv: sortkey(kv[0])):
         members.sort(key=lambda s: s["source_id"])
         doc_id = f"D-{pid}-{unit}"
-        parts, buf = [], f"{who(pid)} · {unit}\n\n"
+        ids = [s["source_id"] for s in members]
+        kinds = sorted({s["kind"] for s in members if s["kind"]})
+        buf = heading(f"{who(pid)} · {unit}",
+                      f'{"/".join(kinds) or "source"} · {len(members)} '
+                      f'source{"" if len(members) == 1 else "s"}', ids)
         for s in members:
             label = (s["label"] or "").strip()
             head = D["questions"].get(label[:60], label)
             if head:
-                buf += head + "\n"
+                buf += head + "\n\n"
             place[s["source_id"]] = (doc_id, len(buf))
-            buf += s["text"] + "\n\n"
-            parts.append(s["source_id"])
+            buf += s["text"].strip() + "\n\n"
         docs[doc_id] = {"name": f"{who(pid)} · {unit}",
                         "text": buf.rstrip() + "\n",
-                        "desc": f'{len(members)} source(s): ' + "; ".join(parts),
+                        "desc": f'{len(members)} source(s): ' + "; ".join(ids),
                         "pid": pid, "unit": unit}
     return docs, place
 
@@ -263,8 +288,11 @@ def questions(path):
     walk(json.load(io.open(path, encoding="utf-8")))
     out = {}
     for q in found:
+        # The label is the question without its number, truncated; the value
+        # keeps the number, because that is what ties a heading back to the
+        # instrument somebody will want to look at later.
         bare = re.sub(r"^\s*\d+[.)]\s*", "", q).strip()
-        out[bare[:60]] = bare
+        out[bare[:60]] = q.strip()
     return out
 
 
