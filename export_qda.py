@@ -454,6 +454,15 @@ def build(D, a):
                f'This source belongs to no single {unit_label}, so it is a case '
                f'of its own. Do not add it to this participant\'s {unit_label} '
                f'cases: its codings would then count against every one of them.')
+        # Whoever coded this participant, and in which pass. Without it these
+        # cases are the only ones in the project you cannot filter by coding
+        # status, which is the first thing a second coder wants to do.
+        for col, src in (("pass", pass_of), ("coder", coder_of)):
+            if src.get(s["pid"]):
+                d.open("VariableValue")
+                d.leaf("VariableRef", targetGUID=guid("var", col))
+                d.text("TextValue", src[s["pid"]])
+                d.close("VariableValue")
         d.leaf("SourceRef", targetGUID=guid("source", s["source_id"]))
         d.close("Case")
     d.close("Cases")
